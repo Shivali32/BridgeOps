@@ -1,5 +1,5 @@
 
-# OpsBridge
+# BridgOps
 
 Multi-Tenant Enterprise Integration & Workflow Platform
 

@@ -1,9 +1,8 @@
-
 from fastapi import FastAPI
 
 app = FastAPI(
-    title="OpsBridge API",
-    description="Enterprise Integration and Workflow Platform",
+    title="BridgOps API",
+    description="Retail Integration and Workflow Platform",
     version="0.1.0",
 )
 
@@ -12,5 +11,5 @@ app = FastAPI(
 def health_check():
     return {
         "status": "healthy",
-        "service": "opsbridge-api",
+        "service": "bridgops-api",
     }
