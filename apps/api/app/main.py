@@ -5,12 +5,15 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.db import get_db
+from app.api.tenants import router as tenants_router
 
 app = FastAPI(
     title="BridgOps API",
     description="Retail Integration and Workflow Platform",
     version="0.1.0",
 )
+
+app.include_router(tenants_router)
 
 
 @app.get("/health")
