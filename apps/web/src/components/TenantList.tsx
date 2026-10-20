@@ -1,14 +1,23 @@
 
 import { useEffect, useState } from 'react'
 
-import { getTenants } from '../api/tenants'
+import {
+  deactivateTenant,
+  getTenants,
+} from '../api/tenants'
+
 import type { Tenant } from '../types/tenant'
+import TenantForm from './TenantForm'
 
 function TenantList() {
   const [tenants, setTenants] = useState<Tenant[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
   const [refreshKey, setRefreshKey] = useState(0)
+  const [showForm, setShowForm] = useState(false)
+  const [editingTenant, setEditingTenant] = useState<Tenant | null>(null)
+  const [deactivatingId, setDeactivatingId] = useState<string | null>(null)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -28,7 +37,7 @@ function TenantList() {
           setError(
             err instanceof Error
               ? err.message
-              : 'An unexpected error occurred'
+              : 'Unable to load retailers.'
           )
         }
       } finally {
@@ -43,22 +52,98 @@ function TenantList() {
     return () => controller.abort()
   }, [refreshKey])
 
+  function refreshTenants() {
+    setRefreshKey((value) => value + 1)
+  }
+
+  function handleFormSuccess() {
+    setShowForm(false)
+    setEditingTenant(null)
+    setActionError(null)
+    refreshTenants()
+  }
+
+  function handleCancel() {
+    setShowForm(false)
+    setEditingTenant(null)
+  }
+
+  function handleEdit(tenant: Tenant) {
+    setEditingTenant(tenant)
+    setShowForm(true)
+    setActionError(null)
+  }
+
+  async function handleDeactivate(tenant: Tenant) {
+    const confirmed = window.confirm(
+      `Are you sure you want to deactivate ${tenant.name}?`
+    )
+
+    if (!confirmed) return
+
+    setDeactivatingId(tenant.id)
+    setActionError(null)
+
+    try {
+      await deactivateTenant(tenant.id)
+      refreshTenants()
+    } catch (err) {
+      setActionError(
+        err instanceof Error
+          ? err.message
+          : 'Unable to deactivate retailer.'
+      )
+    } finally {
+      setDeactivatingId(null)
+    }
+  }
+
   return (
     <section className="tenant-section">
       <div className="section-header">
         <div>
           <h2>Registered Retailers</h2>
-          <p>Businesses using the BridgOps platform.</p>
+          <p>Manage businesses using BridgOps.</p>
         </div>
 
-        <button
-          type="button"
-          onClick={() => setRefreshKey((value) => value + 1)}
-          disabled={loading}
-        >
-          Refresh
-        </button>
+        <div className="section-actions">
+          <button
+            type="button"
+            className="button-secondary"
+            onClick={refreshTenants}
+            disabled={loading}
+          >
+            Refresh
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setEditingTenant(null)
+              setShowForm(true)
+              setActionError(null)
+            }}
+            disabled={showForm}
+          >
+            Add Retailer
+          </button>
+        </div>
       </div>
+
+      {showForm && (
+        <TenantForm
+          key={editingTenant?.id ?? 'new'}
+          tenant={editingTenant ?? undefined}
+          onSuccess={handleFormSuccess}
+          onCancel={handleCancel}
+        />
+      )}
+
+      {actionError && (
+        <p role="alert" className="error-message">
+          {actionError}
+        </p>
+      )}
 
       {loading && <p>Loading retailers...</p>}
 
@@ -81,6 +166,7 @@ function TenantList() {
                 <th>Slug</th>
                 <th>Status</th>
                 <th>Created</th>
+                <th>Actions</th>
               </tr>
             </thead>
 
@@ -104,6 +190,29 @@ function TenantList() {
                     {new Date(
                       tenant.created_at
                     ).toLocaleDateString()}
+                  </td>
+                  <td>
+                    <div className="table-actions">
+                      <button
+                        type="button"
+                        className="button-secondary"
+                        onClick={() => handleEdit(tenant)}
+                        disabled={!tenant.is_active || showForm || deactivatingId !== null}
+                      >
+                        Edit
+                      </button>
+
+                      <button
+                        type="button"
+                        className="button-danger"
+                        onClick={() => void handleDeactivate(tenant)}
+                        disabled={!tenant.is_active || showForm || deactivatingId !== null}
+                      >
+                        {deactivatingId === tenant.id
+                          ? 'Deactivating...'
+                          : 'Deactivate'}
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
