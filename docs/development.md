@@ -319,3 +319,30 @@ Save an order, then click its Process button. View shows items, execution steps,
 timestamps, requests/results and provider references. Refresh orders reloads states.
 Prices remain decimal strings across the browser/API boundary. Orders are scoped
 by tenant; selecting a tenant is not authentication.
+
+## Integrations and imports (Stage 3)
+
+Set `INGEST_TOKEN` in the repository `.env` to a local value and restart the API.
+Do not commit that value. Configuration endpoints are for trusted local use only.
+
+Use `/api/v1/tenants/{tenant_id}/connectors` to inspect built-in field mappings.
+`POST /integrations` creates a name, connector_type, enabled flag and optional
+mapping. `PATCH /integrations/{id}` takes the complete settings plus
+expected_version, rejecting stale updates. Connector type is immutable.
+
+For `shopify_simulated`, send `{id, line_items: [{sku, quantity, price}]}`.
+For `custom_rest`, send `{reference, products: [{product_code, count, price_cents}]}`.
+Both use `POST /integrations/{id}/ingest` with `X-Development-Token`.
+For `csv`, `POST /integrations/{id}/csv` accepts `{csv_text: "..."}` and the same
+header. Default columns: order_reference, product_code, qty, unit_price. Multiple
+rows with the same order_reference form one order. A bad item fails its full order
+group, while other groups are saved. The response identifies every group's rows.
+Imports save orders; processing stays an explicit action in Stage 3.
+
+`GET /imports?limit=50&offset=0` provides persistent results. Failed imports can
+be corrected and submitted again as new import attempts. Successful duplicate
+submissions reuse the same order. Import snapshots remain unchanged after updates.
+Custom mappings accept dotted dictionary paths, defaults and Decimal cents conversion.
+CSV mappings use flat columns and a synthetic items collection named rows.
+Provider secrets and outbound URLs are not accepted in these configuration objects.
+These simulated incoming adapters do not poll live Shopify or other provider APIs.

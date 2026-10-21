@@ -10,5 +10,4 @@ __all__ = [
     "WorkflowExecution",
 ]
 
-# Register the independent demo providers' tables for Alembic.
-from app.providers.models import Reservation, Stock  # noqa: F401
+from app.models.integration import ImportRecord, Integration  # noqa: F401

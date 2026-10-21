@@ -7,6 +7,7 @@ from sqlalchemy import pool
 from app.db import DATABASE_URL, engine
 from app.models.base import Base
 import app.models  # Registers our SQLAlchemy models
+import app.providers.models  # Registers independent demo-provider tables
 
 config = context.config
 

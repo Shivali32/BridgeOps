@@ -10,7 +10,8 @@ os.environ.setdefault("POSTGRES_USER", "bridgops_test")
 os.environ.setdefault("POSTGRES_PASSWORD", "local_test_only")
 os.environ.setdefault("POSTGRES_DB", "bridgops_test")
 
-import app.models  # noqa: F401
+import app.models
+import app.providers.models  # noqa: F401
 from app.models.base import Base
 
 

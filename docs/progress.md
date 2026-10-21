@@ -227,3 +227,24 @@ Roadmap for this branch supersedes the older roadmap above:
   CI evidence upload. CI starts all three HTTP services against PostgreSQL.
 - Browser download in Work returned invalid archives, so local browser execution
   is blocked. Component tests, lint and build still pass. CI browser result pending.
+
+### Steps 3.4 and 3.5
+
+- Tenant-owned integration create/update/list APIs with optimistic version checks,
+  connector validation and enable/disable settings. Secrets are not configuration fields.
+- Incoming simulated provider payloads and CSV imports require an environment-backed
+  development token. Management endpoints remain trusted-local-only without user auth.
+- Import records persist before processing and store mapping snapshots, payload
+  digests, source references, row numbers, duplicate outcomes and safe error messages.
+  A crash can leave a pending import for investigation; raw provider payloads are not stored.
+- CSV groups multiple rows per order, rejects invalid order groups atomically, keeps
+  successful groups, and limits input to 500 rows/100 orders/256 KiB.
+- Imports use the existing order service and its tenant-scoped duplicate protection.
+- Local: 63 backend tests passed, 7 PostgreSQL tests skipped; lint and format pass.
+
+### Independent service startup correction
+
+Browser CI detected a provider-model registration cycle that was hidden by pytest's
+shared imports. Moved provider registration to Alembic and test setup, and added
+fresh-interpreter import tests for API, inventory and fulfillment. Local backend:
+66 passed, 7 PostgreSQL tests skipped. Browser CI will be rerun on this fix.
