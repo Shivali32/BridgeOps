@@ -1,14 +1,11 @@
-
 import os
+from collections.abc import Generator
 from pathlib import Path
 
 from dotenv import load_dotenv
 from sqlalchemy import create_engine
 from sqlalchemy.engine import URL
-from sqlalchemy.orm import sessionmaker
-
-from collections.abc import Generator
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, sessionmaker
 
 # Find .env in the repository root
 BASE_DIR = Path(__file__).resolve().parents[3]
@@ -33,6 +30,7 @@ DATABASE_URL = URL.create(
 engine = create_engine(
     DATABASE_URL,
     pool_pre_ping=True,
+    connect_args={"connect_timeout": 5},
 )
 
 # Create a session factory

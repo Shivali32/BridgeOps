@@ -43,6 +43,13 @@ jobs:
 
       - name: Run backend tests
         run: python -m pytest -v
+        
+      - name: Check Python linting
+        run: python -m ruff check app tests
+
+      - name: Check Python formatting
+        run: python -m ruff format --check app tests
+
 
   frontend:
     name: Frontend Tests and Build

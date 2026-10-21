@@ -1,4 +1,3 @@
-
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
@@ -13,7 +12,6 @@ from app.schemas.tenant import (
 )
 from app.services import tenant as tenant_service
 from app.services.tenant import DuplicateTenantSlugError
-
 
 router = APIRouter(
     prefix="/api/v1/tenants",
