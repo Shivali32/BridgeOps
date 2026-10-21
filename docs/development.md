@@ -277,3 +277,17 @@ so callers must reconcile the outcome instead of assuming failure.
 The simulator controls are process-local and intended for a single Uvicorn worker.
 Reservations and stock are persistent. API requests accept `tenant_id` in JSON;
 lookups require `tenant_id` as a query parameter. See each service's `/docs`.
+
+## Simulated fulfillment (Step 2.5)
+
+In a separate backend virtual-environment terminal:
+
+```powershell
+$env:ENABLE_DEMO_ADMIN = "true"
+python -m uvicorn app.providers.fulfillment:app --port 8002
+```
+
+Compose equivalent: `docker compose --profile app up -d --build fulfillment`.
+The same bounded `/demo/behavior` controls are supported. Fulfillment POST accepts
+`tenant_id`, `order_id`, `reservation_id`, `items`, and `idempotency_key`.
+The returned `accepted` status never represents delivery.

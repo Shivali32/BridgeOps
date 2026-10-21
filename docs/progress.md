@@ -172,3 +172,12 @@ Roadmap for this branch supersedes the older roadmap above:
 - Local: 34 passed, 4 PostgreSQL tests skipped; lint and format pass.
 - Step 2.3D CI passed both jobs, including migrations and PostgreSQL races:
   https://github.com/Shivali32/BridgeOps/actions/runs/39656158054
+
+### Step 2.5
+
+- Independent fulfillment HTTP service on 8002; accepted requests have stable IDs,
+  tenant-scoped lookups and persistent idempotency keys with conflict detection.
+- Added reconciliation-by-key, development delay/failure controls, migration,
+  Compose profile and PostgreSQL duplicate/conflict race tests.
+- Local: 35 passed, 6 PostgreSQL tests skipped; lint/format pass.
+- Accepted fulfillment means provider submission, not delivery.
