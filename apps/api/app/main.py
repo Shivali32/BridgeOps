@@ -1,3 +1,5 @@
+from typing import Annotated
+
 from fastapi import Depends, FastAPI, HTTPException
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
@@ -5,6 +7,8 @@ from sqlalchemy.orm import Session
 
 from app.api.tenants import router as tenants_router
 from app.db import get_db
+
+DbSession = Annotated[Session, Depends(get_db)]
 
 app = FastAPI(
     title="BridgOps API",
@@ -24,7 +28,7 @@ def health_check():
 
 
 @app.get("/health/db")
-def database_health(db: Session = Depends(get_db)):
+def database_health(db: DbSession):
     try:
         db.execute(text("SELECT 1"))
 

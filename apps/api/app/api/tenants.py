@@ -1,4 +1,5 @@
 import uuid
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy.orm import Session
@@ -12,6 +13,8 @@ from app.schemas.tenant import (
 )
 from app.services import tenant as tenant_service
 from app.services.tenant import DuplicateTenantSlugError
+
+DbSession = Annotated[Session, Depends(get_db)]
 
 router = APIRouter(
     prefix="/api/v1/tenants",
@@ -41,7 +44,7 @@ def find_tenant_or_404(
 )
 def create_tenant(
     data: TenantCreate,
-    db: Session = Depends(get_db),
+    db: DbSession,
 ):
     try:
         return tenant_service.create_tenant(db, data)
@@ -54,9 +57,9 @@ def create_tenant(
 
 @router.get("", response_model=list[TenantResponse])
 def list_tenants(
-    offset: int = Query(default=0, ge=0),
-    limit: int = Query(default=50, ge=1, le=100),
-    db: Session = Depends(get_db),
+    db: DbSession,
+    offset: Annotated[int, Query(ge=0)] = 0,
+    limit: Annotated[int, Query(ge=1, le=100)] = 50,
 ):
     return tenant_service.list_tenants(db, offset, limit)
 
@@ -64,7 +67,7 @@ def list_tenants(
 @router.get("/{tenant_id}", response_model=TenantResponse)
 def get_tenant(
     tenant_id: uuid.UUID,
-    db: Session = Depends(get_db),
+    db: DbSession,
 ):
     return find_tenant_or_404(tenant_id, db)
 
@@ -73,7 +76,7 @@ def get_tenant(
 def update_tenant(
     tenant_id: uuid.UUID,
     data: TenantUpdate,
-    db: Session = Depends(get_db),
+    db: DbSession,
 ):
     tenant = find_tenant_or_404(tenant_id, db)
     return tenant_service.update_tenant(db, tenant, data)
@@ -82,7 +85,7 @@ def update_tenant(
 @router.delete("/{tenant_id}", status_code=204)
 def delete_tenant(
     tenant_id: uuid.UUID,
-    db: Session = Depends(get_db),
+    db: DbSession,
 ):
     tenant = find_tenant_or_404(tenant_id, db)
     tenant_service.deactivate_tenant(db, tenant)
