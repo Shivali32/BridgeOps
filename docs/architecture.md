@@ -206,3 +206,50 @@ These are planned components, not currently implemented features.
 - Introduce asynchronous processing for concrete needs
 - Make failures observable and recoverable
 - Prioritize maintainability over tool count
+
+
+
+## Stage 2: Order and Workflow Data Model
+
+The order-processing system introduces four tables:
+
+- orders
+- order_items
+- workflow_executions
+- step_executions
+
+### Relationships
+
+- One tenant can own multiple orders.
+- One order contains multiple order items.
+- One order can have multiple workflow executions.
+- One workflow execution contains multiple step executions.
+
+### Tenant Ownership
+
+Orders reference the owning tenant through tenant_id.
+
+Workflow executions use a composite foreign key on
+(order_id, tenant_id) to prevent referencing orders owned
+by another tenant.
+
+### Data Integrity
+
+Database constraints enforce:
+
+- Unique external order IDs within each tenant
+- Unique SKUs within an order
+- Positive item quantities
+- Non-negative optional prices
+- Allowed status values
+- Valid foreign-key relationships
+
+### Current Scope
+
+These models provide persistent storage for order processing.
+
+Order APIs, inventory integrations, fulfillment integrations,
+and workflow orchestration will be implemented in subsequent
+Stage 2 steps.
+
+Authentication and authorization are not yet implemented.
