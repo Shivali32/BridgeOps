@@ -297,3 +297,7 @@ https://github.com/Shivali32/BridgeOps/actions/runs/39659555088
   reject, decision notes and honest unverified local attribution.
 - Frontend: 28 tests passed, lint/build passed. Backend: 85 passed locally,
   8 PostgreSQL concurrency tests skipped. Added a real browser approval journey.
+
+Stage 4 browser test correction: CI exposed an ambiguous test locator matching both
+Save workflow and Save workflow assignment. The test now selects the exact button
+name. PostgreSQL/backend checks and both earlier browser journeys passed.

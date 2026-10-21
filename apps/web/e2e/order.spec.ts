@@ -51,7 +51,7 @@ test('operator configures approval and resumes a paused order', async ({ page, r
   await page.getByLabel('Workflow name').fill('High value approval')
   await page.getByLabel('Default for this retailer').check()
   await page.getByRole('button', { name: 'Use approval steps' }).click()
-  await page.getByRole('button', { name: 'Save workflow' }).click()
+  await page.getByRole('button', { name: 'Save workflow', exact: true }).click()
   await expect(page.getByRole('button', { name: 'Edit High value approval' })).toBeVisible()
   await page.getByRole('button', { name: 'Orders', exact: true }).click()
   await page.getByLabel('External order ID').fill('APPROVAL-1')
