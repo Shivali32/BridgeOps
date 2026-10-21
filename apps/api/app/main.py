@@ -6,11 +6,13 @@ from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
+from app.api.definitions import router as definitions_router
 from app.api.integrations import router as integrations_router
 from app.api.orders import router as orders_router
 from app.api.tenants import router as tenants_router
 from app.api.workflows import router as workflows_router
 from app.db import get_db
+from app.services.definition import WorkflowConflictError
 from app.services.integration import IntegrationConflictError
 from app.services.order import (
     InactiveTenantError,
@@ -30,6 +32,7 @@ app.include_router(tenants_router)
 app.include_router(orders_router)
 app.include_router(workflows_router)
 app.include_router(integrations_router)
+app.include_router(definitions_router)
 
 
 async def domain_error(request: Request, exc: Exception):
@@ -42,6 +45,7 @@ for error in (
     OrderNotFoundError,
     InactiveTenantError,
     IntegrationConflictError,
+    WorkflowConflictError,
 ):
     app.add_exception_handler(error, domain_error)
 

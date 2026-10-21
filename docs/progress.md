@@ -276,3 +276,15 @@ https://github.com/Shivali32/BridgeOps/actions/runs/39659555088
 - Rules support Decimal order totals, quantity, SKU membership and source fields.
   Missing prices fail explicitly. Forward/circular references and unsafe provider
   step order are rejected. No arbitrary code execution is supported.
+
+### Steps 4.3 to 4.5
+
+- Workflow runner resolves integration assignments or retailer defaults, snapshots
+  definition version/source/order values, evaluates conditions and records skipped branches.
+- Approval requests pause before reservation. Decisions are tenant-scoped and use
+  an execution lock; repeated identical decisions return existing state and conflicting
+  decisions are rejected. Approved executions resume their original snapshot.
+- Missing rule inputs become explicit attention states. No authentication is implied
+  by self-reported development operator names.
+- Local backend: 85 passed, 8 PostgreSQL tests skipped; lint/format pass. Includes
+  real HTTP approval pause/resume and PostgreSQL conflicting-decision coverage.

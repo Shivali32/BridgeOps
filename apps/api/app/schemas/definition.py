@@ -117,3 +117,26 @@ class DefinitionResponse(BaseModel):
     version: int
     configuration: dict
     created_at: datetime
+
+
+class ApprovalDecision(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    decision: Literal["approve", "reject"]
+    note: str = Field(default="", max_length=1000)
+    development_operator: str = Field(
+        default="Local demo operator (unverified)", min_length=1, max_length=100
+    )
+
+
+class ApprovalResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: UUID
+    tenant_id: UUID
+    execution_id: UUID
+    step_name: str
+    reason: str
+    status: str
+    decision_note: str | None
+    development_operator: str | None
+    created_at: datetime
+    decided_at: datetime | None

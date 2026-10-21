@@ -210,3 +210,39 @@ def test_actual_http_three_retailer_imports(live, monkeypatch):
         assert order["items"][0]["unit_price"] == "12.50"
         execution = c.post(base + f"/orders/{order['id']}/process").json()
         assert execution["status"] == "completed"
+
+
+def test_actual_http_approval_pause_and_resume(live):
+    from test_approvals import approval_definition
+
+    c, inv, _ful = live
+    tenant_id, url, _, _ = submit(c, inv)
+    base = f"/api/v1/tenants/{tenant_id}"
+    definition = approval_definition("500.00")
+    assert c.post(base + "/workflow-definitions", json=definition).status_code == 201
+    order = c.post(
+        url,
+        json={
+            "external_order_id": "APPROVAL-1",
+            "items": [{"sku": "A", "quantity": 2, "unit_price": "300.00"}],
+        },
+    ).json()
+    result = c.post(url + f"/{order['id']}/process").json()
+    assert result["status"] == "needs_attention"
+    assert [s["status"] for s in result["steps"]] == ["completed", "pending"]
+    with httpx.Client(trust_env=False) as p:
+        assert p.post(
+            inv + "/inventory/check",
+            json={"tenant_id": tenant_id, "items": [{"sku": "A", "quantity": 5}]},
+        ).json()["available"]
+    approval = c.get(base + "/approvals?status=pending").json()[0]
+    resumed = c.post(
+        base + f"/approvals/{approval['id']}/decision",
+        json={"decision": "approve", "note": "Reviewed locally"},
+    ).json()
+    assert resumed["status"] == "completed"
+    assert resumed["steps"][-1]["output_summary"]["status"] == "accepted"
+    again = c.post(
+        base + f"/approvals/{approval['id']}/decision", json={"decision": "approve"}
+    ).json()
+    assert again["id"] == resumed["id"]
