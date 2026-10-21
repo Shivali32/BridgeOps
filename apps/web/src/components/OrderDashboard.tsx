@@ -1,5 +1,7 @@
+import Status from './Status'
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
+import IntegrationManager from './IntegrationManager'
 import { getTenants } from '../api/tenants'
 import { createOrder, getOrders, getExecutions, processOrder } from '../api/orders'
 import { errorMessage } from '../api/client'
@@ -25,9 +27,6 @@ export function ExecutionDetails({ execution }: { execution: Execution }) {
   </article>
 }
 
-export function Status({ value }: { value: string }) {
-  return <span className={`status-badge status-${value}`}>{value.replaceAll('_', ' ')}</span>
-}
 
 function OrderForm({ tenant, onSaved }: { tenant: string; onSaved: () => void }) {
   const [externalId, setExternalId] = useState('')
@@ -115,6 +114,7 @@ export function Orders({ tenant }: { tenant: string }) {
 }
 
 export default function OrderDashboard() {
+  const [tab, setTab] = useState('orders')
   const [tenants, setTenants] = useState<Tenant[]>([])
   const [selected, setSelected] = useState('')
   const [error, setError] = useState('')
@@ -128,6 +128,6 @@ export default function OrderDashboard() {
     <p className="local-notice">Local demo. Tenant selection does not provide access control.</p>
     <label className="form-field">Retailer for orders<select value={selected} onChange={e => setSelected(e.target.value)}><option value="">Select a retailer</option>{tenants.map(t => <option key={t.id} value={t.id}>{t.name}{!t.is_active && ' (inactive)'}</option>)}</select></label>
     {error && <p role="alert">{error}</p>}
-    {selected && <Orders key={selected} tenant={selected} />}
+    {selected && <><nav className="workspace-nav" aria-label="Retail workspace"><button aria-pressed={tab === 'orders'} onClick={() => setTab('orders')}>Orders</button><button aria-pressed={tab === 'integrations'} onClick={() => setTab('integrations')}>Integrations</button></nav>{tab === 'orders' ? <Orders key={selected} tenant={selected} /> : <IntegrationManager key={selected} tenant={selected} />}</>}
   </section>
 }

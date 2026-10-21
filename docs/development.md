@@ -346,3 +346,30 @@ Custom mappings accept dotted dictionary paths, defaults and Decimal cents conve
 CSV mappings use flat columns and a synthetic items collection named rows.
 Provider secrets and outbound URLs are not accepted in these configuration objects.
 These simulated incoming adapters do not poll live Shopify or other provider APIs.
+
+## Start the full local stack
+
+With Docker Desktop running, configure `.env`, including INGEST_TOKEN. From the root:
+
+```powershell
+docker compose --profile app up -d --build
+cd apps\web
+npm.cmd ci
+npm.cmd run dev
+```
+
+The app profile runs Alembic before the API. It preserves the existing PostgreSQL
+volume. Do not run a second host API on port 8000 at the same time. The React
+Integrations tab supports creation, versioned editing, mappings, enable/disable,
+sample provider JSON, CSV file upload and result history. Enter your local token
+only in the import form; it is kept in component memory and not browser storage.
+
+A manual backend virtual-environment workflow remains supported by the earlier
+instructions. To execute PostgreSQL tests locally, create a dedicated test database
+and set TEST_DATABASE_URL to its SQLAlchemy `postgresql+psycopg://...` URL. Tests
+create/drop random test schemas there. Never point test configuration at production.
+
+Browser verification uses `npx playwright install chromium` then
+`npx playwright test` from apps/web, with all HTTP services already running.
+The CSV browser scenario expects INGEST_TOKEN=ci_local_ingestion_token on its
+isolated demo API. Do not use that documented test token on an exposed service.

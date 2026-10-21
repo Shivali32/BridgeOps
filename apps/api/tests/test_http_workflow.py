@@ -8,10 +8,12 @@ from uuid import uuid4
 import httpx
 import pytest
 import uvicorn
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import Session
 
 from app.db import get_db
 from app.main import app as api
+from app.models.base import Base
 from app.providers.common import Behavior
 from app.providers.fulfillment import app as fulfillment
 from app.providers.fulfillment import simulator as fulfillment_simulator
@@ -43,13 +45,21 @@ def serve(app):
 
 
 @pytest.fixture
-def live(request, engine, monkeypatch):
+def live(request, tmp_path, monkeypatch):
     # CI uses real PostgreSQL. SQLite here verifies HTTP behavior only.
-    test_engine = (
-        request.getfixturevalue("pg_engine")
-        if os.getenv("TEST_DATABASE_URL")
-        else engine
-    )
+    if os.getenv("TEST_DATABASE_URL"):
+        test_engine = request.getfixturevalue("pg_engine")
+    else:
+        test_engine = create_engine(
+            f"sqlite+pysqlite:///{tmp_path / 'http.db'}",
+            connect_args={"check_same_thread": False},
+        )
+
+        @event.listens_for(test_engine, "connect")
+        def foreign_keys(connection, _):
+            connection.execute("PRAGMA foreign_keys=ON")
+
+        Base.metadata.create_all(test_engine)
 
     def db():
         with Session(test_engine, expire_on_commit=False) as session:
@@ -72,6 +82,8 @@ def live(request, engine, monkeypatch):
     finally:
         for app in (api, inventory, fulfillment):
             app.dependency_overrides.clear()
+        if not os.getenv("TEST_DATABASE_URL"):
+            test_engine.dispose()
 
 
 def submit(client, inv, external="HTTP-1"):
@@ -142,3 +154,59 @@ def test_actual_http_timeout_after_provider_commit(live, monkeypatch):
             == "accepted"
         )
     assert c.post(f"{url}/{order['id']}/process").json()["id"] == result["id"]
+
+
+def test_actual_http_three_retailer_imports(live, monkeypatch):
+    c, inv, _ = live
+    monkeypatch.setenv("INGEST_TOKEN", "http-test-token")
+    auth = {"X-Development-Token": "http-test-token"}
+    cases = [
+        (
+            "shopify_simulated",
+            {
+                "id": "SOURCE-1",
+                "line_items": [{"sku": "A", "quantity": 2, "price": "12.50"}],
+            },
+        ),
+        (
+            "custom_rest",
+            {
+                "reference": "SOURCE-1",
+                "products": [{"product_code": "A", "count": "2", "price_cents": 1250}],
+            },
+        ),
+        (
+            "csv",
+            "order_reference,product_code,qty,unit_price\nSOURCE-1,A,2,12.50\nBAD-1,A,0,2.00",
+        ),
+    ]
+    for kind, data in cases:
+        tenant_id = c.post(
+            "/api/v1/tenants", json={"name": kind, "slug": kind.replace("_", "-")}
+        ).json()["id"]
+        base = f"/api/v1/tenants/{tenant_id}"
+        config = c.post(
+            base + "/integrations", json={"name": "Source", "connector_type": kind}
+        ).json()
+        with httpx.Client(trust_env=False) as p:
+            p.put(
+                inv + "/inventory/stock",
+                json={"tenant_id": tenant_id, "sku": "A", "available": 5},
+            )
+        endpoint = (
+            base
+            + f"/integrations/{config['id']}/"
+            + ("csv" if kind == "csv" else "ingest")
+        )
+        response = c.post(
+            endpoint, json={"csv_text": data} if kind == "csv" else data, headers=auth
+        )
+        assert response.status_code == 200
+        record = response.json()[0] if kind == "csv" else response.json()
+        if kind == "csv":
+            assert response.json()[1]["status"] == "failed"
+        assert record["status"] == "succeeded"
+        order = c.get(base + f"/orders/{record['order_id']}").json()
+        assert order["items"][0]["unit_price"] == "12.50"
+        execution = c.post(base + f"/orders/{order['id']}/process").json()
+        assert execution["status"] == "completed"

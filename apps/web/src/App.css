@@ -299,3 +299,7 @@ button:focus-visible, select:focus-visible, summary:focus-visible { outline: 2px
 pre { overflow: auto; max-height: 300px; padding: 14px; background: #f1f5f9; font-size: 12px; }
 .local-notice { color: #92400e; font-size: 13px; }
 @media (max-width: 700px) { .item-row { grid-template-columns: 1fr 1fr; } .execution-card { padding: 12px; } }
+.mapping-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(160px,1fr)); gap: 16px; margin-top: 16px; }
+.workspace-nav { display: flex; gap: 10px; margin: 24px 0; flex-wrap: wrap; }
+.workspace-nav button[aria-pressed="true"] { color: #fff; background: #2563eb; border-color: #2563eb; }
+textarea { width: 100%; resize: vertical; font-family: monospace; }

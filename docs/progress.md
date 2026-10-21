@@ -248,3 +248,15 @@ Browser CI detected a provider-model registration cycle that was hidden by pytes
 shared imports. Moved provider registration to Alembic and test setup, and added
 fresh-interpreter import tests for API, inventory and fulfillment. Local backend:
 66 passed, 7 PostgreSQL tests skipped. Browser CI will be rerun on this fix.
+
+### Step 3.6 and Stage 3 verification
+
+- React integration workspace supports structured mapping fields, create/edit,
+  enable/disable, JSON samples, CSV file upload, token input and import histories.
+- Added six integration UI tests. Frontend: 22 passed, lint/build pass.
+- Added a real HTTP three-retailer test exercising Shopify-style, REST and CSV
+  imports followed by inventory/reservation/fulfillment; invalid CSV groups are reported.
+- Backend: 67 passed locally, 7 PostgreSQL tests skipped. CI runs database races
+  and HTTP tests against PostgreSQL. Browser checks include order and CSV journeys.
+- Compose app profile now includes migrations, API, inventory and fulfillment with
+  loopback ports; PostgreSQL-only operation remains available without the profile.
