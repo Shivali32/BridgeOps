@@ -1,5 +1,6 @@
 
 import TenantList from './components/TenantList'
+import OrderDashboard from './components/OrderDashboard'
 import './App.css'
 
 function App() {
@@ -18,6 +19,7 @@ function App() {
         </p>
 
         <TenantList />
+        <OrderDashboard />
       </main>
     </div>
   )

@@ -197,3 +197,16 @@ Roadmap for this branch supersedes the older roadmap above:
   and timeout-after-provider-commit scenarios passed locally against test SQLite.
   CI runs those HTTP scenarios against PostgreSQL.
 - Inventory milestone CI passed: https://github.com/Shivali32/BridgeOps/actions/runs/39656503661
+
+### Step 2.7
+
+- Extended the existing React application with a retailer-scoped order workspace,
+  multi-item forms, optional decimal price strings, pagination, processing controls,
+  step history, provider references, error/loading/empty states and refresh controls.
+- Unknown outcomes and accepted fulfillment are described accurately.
+- Added 9 frontend tests (16 total) covering forms, API errors, status/details,
+  processing and tenant selection. Frontend lint and production build pass.
+- Workflow milestone CI passed, including PostgreSQL races and real HTTP workflows:
+  https://github.com/Shivali32/BridgeOps/actions/runs/39657334948
+- Stage 2 implementation and automated HTTP/component verification are complete.
+  Browser smoke verification is pending; no claim of Windows Docker verification.

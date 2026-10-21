@@ -310,3 +310,12 @@ The API session factory must use `expire_on_commit=False` so reading identifiers
 does not open implicit transactions between a step commit and an external call.
 A process crash can leave a running execution; repeated process calls intentionally
 return it instead of duplicating work. Recovery controls are a later milestone.
+
+## React order demonstration
+
+Open http://localhost:5173, refresh retailer choices and select a retailer under
+Order processing. Create stock for that tenant using the inventory service first.
+Save an order, then click its Process button. View shows items, execution steps,
+timestamps, requests/results and provider references. Refresh orders reloads states.
+Prices remain decimal strings across the browser/API boundary. Orders are scoped
+by tenant; selecting a tenant is not authentication.
