@@ -133,7 +133,8 @@ def test_actual_http_order_workflow(live):
     )
 
 
-def test_actual_http_timeout_after_provider_commit(live, monkeypatch):
+@pytest.mark.parametrize("resolution", ["reconcile", "verify_reference"])
+def test_actual_http_timeout_after_provider_commit(live, monkeypatch, resolution):
     c, inv, ful = live
     tenant_id, url, order, _ = submit(c, inv)
     monkeypatch.setenv("PROVIDER_TIMEOUT_SECONDS", "0.1")
@@ -146,19 +147,19 @@ def test_actual_http_timeout_after_provider_commit(live, monkeypatch):
     assert result["steps"][-1]["status"] == "unknown"
     key = result["steps"][-1]["idempotency_key"]
     with httpx.Client(trust_env=False) as p:
-        assert (
-            p.get(
-                ful + f"/fulfillment/requests/by-key/{key}",
-                params={"tenant_id": tenant_id},
-            ).json()["status"]
-            == "accepted"
-        )
+        provider_record = p.get(
+            ful + f"/fulfillment/requests/by-key/{key}", params={"tenant_id": tenant_id}
+        ).json()
+        assert provider_record["status"] == "accepted"
     assert c.post(f"{url}/{order['id']}/process").json()["id"] == result["id"]
     resolved = c.post(
         f"/api/v1/tenants/{tenant_id}/executions/{result['id']}/recovery",
         json={
             "request_key": "reconcile-http",
-            "action": "reconcile",
+            "action": resolution,
+            "external_reference": provider_record["id"]
+            if resolution == "verify_reference"
+            else None,
             "note": "Check the response lost after acceptance",
         },
     ).json()

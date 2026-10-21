@@ -337,3 +337,16 @@ https://github.com/Shivali32/BridgeOps/actions/runs/39661754013
 - Frontend: 35 component/API tests passed, lint and production build passed.
 - Browser coverage now includes failure inspection/retry without duplicate reservation;
   the approval browser scenario now approves through the central operations console.
+
+### Stage 5 final product verification
+
+The full operations implementation passed PostgreSQL/backend checks, frontend checks
+and all four browser journeys (order processing, CSV import, central approval and
+failure recovery without duplicate stock reservation):
+https://github.com/Shivali32/BridgeOps/actions/runs/39662968938
+
+Added final coverage for verified external references, cross-tenant recovery access,
+corrected imports and a separate CI job that builds and starts the actual Compose
+images. A repeatable demo script creates three retailers without resetting orders,
+configurations or stock. Compose smoke/demo verification is pending on this commit.
+Local final backend: 101 passed, 10 PostgreSQL tests skipped; frontend: 35 passed.

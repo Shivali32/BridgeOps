@@ -198,3 +198,41 @@ def test_nonretryable_failure_rejects_retry(session):
         recover(
             session, tenant.id, execution.id, action("retry"), RecoveryProvider(session)
         )
+
+
+def test_recovery_cannot_access_another_tenant_execution(session):
+    from app.services.order import OrderNotFoundError
+
+    t, _, execution = failed(session)
+    other_tenant, _ = make_order(session)
+    provider = RecoveryProvider(session)
+    with pytest.raises(OrderNotFoundError):
+        recover(
+            session, other_tenant.id, execution.id, action("investigated"), provider
+        )
+    assert not provider.calls and provider.lookups == 0
+    assert t.id != other_tenant.id
+
+
+def test_supplied_reference_must_match_provider_operation():
+    import httpx
+
+    from app.services.providers import Providers
+
+    tenant_id = str(uuid4())
+    response = {
+        "id": str(uuid4()),
+        "tenant_id": str(uuid4()),
+        "idempotency_key": "key",
+        "status": "accepted",
+        "items": [],
+    }
+    provider = Providers(
+        httpx.MockTransport(lambda _: httpx.Response(200, json=response))
+    )
+    with pytest.raises(ProviderError, match="does not match"):
+        provider.lookup(
+            "fulfillment_request",
+            {"tenant_id": tenant_id, "idempotency_key": "key", "items": []},
+            uuid4(),
+        )

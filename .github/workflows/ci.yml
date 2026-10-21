@@ -56,6 +56,10 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt
 
+      - name: Validate Compose configuration
+        working-directory: .
+        run: docker compose --env-file .env.example --profile app config --quiet
+
       - name: Verify migrations
         run: |
           python -m alembic upgrade head
@@ -136,3 +140,26 @@ jobs:
 
       - name: Build frontend
         run: npm run build
+
+  compose:
+    name: Compose Images and Workflow
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Configure isolated demo environment
+        run: cp .env.example .env
+      - name: Build and start the actual images
+        run: docker compose --profile app up -d --build
+      - name: Verify HTTP order workflow
+        run: python apps/api/scripts/smoke_compose.py
+      - name: Verify repeatable three-retailer demo
+        run: |
+          docker compose --profile app exec -T api python scripts/demo.py
+          docker compose --profile app exec -T api python scripts/demo.py
+      - name: Show logs on failure
+        if: failure()
+        run: docker compose --profile app logs --no-color
+      - name: Stop isolated services
+        if: always()
+        run: docker compose --profile app down

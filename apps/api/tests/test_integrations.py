@@ -124,3 +124,14 @@ def test_failed_imports_are_recorded(api_client, monkeypatch, payload):
     assert result["status"] == "failed" and result["error_message"]
     assert c.get(base + "/orders").json() == []
     assert len(c.get(base + "/imports").json()) == 1
+    corrected = {
+        "reference": "CORRECTED-1",
+        "products": [{"product_code": "A", "count": 2, "price_cents": 1250}],
+    }
+    fixed = c.post(
+        base + f"/integrations/{config['id']}/ingest",
+        json=corrected,
+        headers={"X-Development-Token": "token"},
+    ).json()
+    assert fixed["status"] == "succeeded"
+    assert len(c.get(base + "/imports").json()) == 2
