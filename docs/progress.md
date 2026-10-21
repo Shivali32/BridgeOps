@@ -138,3 +138,25 @@ See development.md.
 - [ ] Documentation committed and verified
 - [ ] Fresh-clone setup verified
 - [ ] Final Stage 1 review completed
+
+## Autonomous development checkpoint, 2026-10-21
+
+Authoritative baseline: `df1e1b6` on `main`. The handoff described order API
+routes that were absent from the repository. Stage 1 baseline: 24 backend tests,
+7 frontend tests, lint/format/build passed in the Work environment.
+
+### Step 2.3D
+
+- Added tenant-scoped order POST/list/detail routes with 201/200/409/404/422 semantics.
+- Rejected writes for inactive tenants; validated missing tenants on reads.
+- Made creation rollback atomic and restricted race recovery to the specific
+  PostgreSQL order uniqueness constraint.
+- Added service/API/rollback/scoping/pagination tests and PostgreSQL concurrent
+  identical/conflicting submissions using independent sessions and isolated schemas.
+- CI now runs on development branches, supplies PostgreSQL 17, and checks migrations.
+- Local result: 32 passed, 2 PostgreSQL tests skipped (no Docker/server available).
+  PostgreSQL behavior remains unverified until CI runs. No SQLite concurrency claim.
+
+Roadmap for this branch supersedes the older roadmap above:
+2 synchronous workflows; 3 connectors/mappings; 4 configurable workflows/approvals;
+5 operations/recovery; 6 Kafka (deferred). No authentication or authorization yet.

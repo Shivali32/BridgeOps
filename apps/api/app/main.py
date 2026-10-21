@@ -5,6 +5,7 @@ from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
+from app.api.orders import router as orders_router
 from app.api.tenants import router as tenants_router
 from app.db import get_db
 
@@ -17,6 +18,7 @@ app = FastAPI(
 )
 
 app.include_router(tenants_router)
+app.include_router(orders_router)
 
 
 @app.get("/health")
