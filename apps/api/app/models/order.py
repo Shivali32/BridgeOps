@@ -1,4 +1,3 @@
-
 import uuid
 from datetime import datetime
 from decimal import Decimal
@@ -92,8 +91,7 @@ class Order(Base):
 
     executions: Mapped[list["WorkflowExecution"]] = relationship(
         back_populates="order",
-        foreign_keys="[WorkflowExecution.order_id, "
-        "WorkflowExecution.tenant_id]",
+        foreign_keys="[WorkflowExecution.order_id, WorkflowExecution.tenant_id]",
     )
 
 
