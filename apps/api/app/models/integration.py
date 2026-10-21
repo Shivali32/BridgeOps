@@ -22,11 +22,18 @@ class Integration(Base):
     __tablename__ = "integrations"
     __table_args__ = (
         UniqueConstraint("id", "tenant_id", name="uq_integration_id_tenant"),
+        ForeignKeyConstraint(
+            ["workflow_id", "tenant_id"],
+            ["workflow_definitions.id", "workflow_definitions.tenant_id"],
+            name="fk_integration_workflow_tenant",
+            ondelete="RESTRICT",
+        ),
     )
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
     tenant_id: Mapped[UUID] = mapped_column(
         Uuid, ForeignKey("tenants.id", ondelete="RESTRICT"), nullable=False, index=True
     )
+    workflow_id: Mapped[UUID | None] = mapped_column(Uuid)
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     connector_type: Mapped[str] = mapped_column(String(50), nullable=False)
     enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)

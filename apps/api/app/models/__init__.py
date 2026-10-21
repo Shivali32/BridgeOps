@@ -10,4 +10,5 @@ __all__ = [
     "WorkflowExecution",
 ]
 
+from app.models.definition import Approval, WorkflowDefinition, WorkflowVersion  # noqa: F401
 from app.models.integration import ImportRecord, Integration  # noqa: F401

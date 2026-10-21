@@ -13,6 +13,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    UniqueConstraint,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.types import Uuid
@@ -27,6 +28,7 @@ class WorkflowExecution(Base):
     __tablename__ = "workflow_executions"
 
     __table_args__ = (
+        UniqueConstraint("id", "tenant_id", name="uq_execution_id_tenant"),
         ForeignKeyConstraint(
             ["order_id", "tenant_id"],
             ["orders.id", "orders.tenant_id"],

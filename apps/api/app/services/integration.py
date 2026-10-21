@@ -36,6 +36,19 @@ def save_integration(
     db: Session, tenant_id: UUID, data: IntegrationCreate, integration_id=None
 ):
     require_tenant(db, tenant_id, active=True)
+    if data.workflow_id is not None:
+        from app.models.definition import WorkflowDefinition
+
+        if (
+            db.scalar(
+                select(WorkflowDefinition.id).where(
+                    WorkflowDefinition.id == data.workflow_id,
+                    WorkflowDefinition.tenant_id == tenant_id,
+                )
+            )
+            is None
+        ):
+            raise OrderNotFoundError("Workflow definition not found.")
     value = None
     if integration_id:
         value = get_integration(db, tenant_id, integration_id, lock=True)

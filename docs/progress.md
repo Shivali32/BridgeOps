@@ -260,3 +260,19 @@ fresh-interpreter import tests for API, inventory and fulfillment. Local backend
   and HTTP tests against PostgreSQL. Browser checks include order and CSV journeys.
 - Compose app profile now includes migrations, API, inventory and fulfillment with
   loopback ports; PostgreSQL-only operation remains available without the profile.
+
+### Stage 3 CI verification
+
+Both CI jobs passed for the full Stage 3 implementation, including PostgreSQL,
+migration checks, independent service startup, real HTTP tests, the browser order
+journey and the browser CSV import journey:
+https://github.com/Shivali32/BridgeOps/actions/runs/39659555088
+
+### Steps 4.1 and 4.2
+
+- Added tenant-scoped workflow definitions, immutable version snapshots, validated
+  ordered steps, typed rule groups, conditional approval branches and integration
+  assignment fields. The schema includes persistent approval state for the runner.
+- Rules support Decimal order totals, quantity, SKU membership and source fields.
+  Missing prices fail explicitly. Forward/circular references and unsafe provider
+  step order are rejected. No arbitrary code execution is supported.

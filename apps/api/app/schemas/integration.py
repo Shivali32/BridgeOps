@@ -12,6 +12,7 @@ class IntegrationCreate(BaseModel):
     name: str = Field(min_length=1, max_length=100)
     connector_type: Literal["shopify_simulated", "custom_rest", "csv"]
     enabled: bool = True
+    workflow_id: UUID | None = None
     mapping: Mapping | None = None
 
 
@@ -27,6 +28,7 @@ class IntegrationResponse(BaseModel):
     connector_type: str
     enabled: bool
     version: int
+    workflow_id: UUID | None
     mapping: dict
     created_at: datetime
 
