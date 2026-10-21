@@ -210,3 +210,13 @@ Roadmap for this branch supersedes the older roadmap above:
   https://github.com/Shivali32/BridgeOps/actions/runs/39657334948
 - Stage 2 implementation and automated HTTP/component verification are complete.
   Browser smoke verification is pending; no claim of Windows Docker verification.
+
+### Steps 3.1 to 3.3
+
+- Added a typed connector protocol and explicit registry for simulated Shopify,
+  custom REST payloads and CSV row groups. Shared mapping code normalizes each
+  distinct source representation to the existing Pydantic OrderCreate model.
+- Controlled dotted-field mapping supports renaming, trimming, type validation,
+  defaults and exact Decimal cents conversion. No eval, dynamic loading or secrets.
+- Added equivalence, nested mapping, invalid configuration, duplicate SKU, missing
+  field, malformed quantity and decimal edge-case tests.
