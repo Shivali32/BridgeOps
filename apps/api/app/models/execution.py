@@ -3,6 +3,8 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 
 from sqlalchemy import (
+    JSON,
+    Boolean,
     CheckConstraint,
     DateTime,
     ForeignKey,
@@ -80,6 +82,11 @@ class WorkflowExecution(Base):
         nullable=True,
     )
 
+    definition_snapshot: Mapped[dict] = mapped_column(
+        JSON, nullable=False, default=dict, server_default="{}"
+    )
+    error_category: Mapped[str | None] = mapped_column(String(50))
+
     order: Mapped["Order"] = relationship(
         back_populates="executions",
         foreign_keys=[order_id, tenant_id],
@@ -155,6 +162,19 @@ class StepExecution(Base):
     error_message: Mapped[str | None] = mapped_column(
         Text,
         nullable=True,
+    )
+
+    input_summary: Mapped[dict] = mapped_column(
+        JSON, nullable=False, default=dict, server_default="{}"
+    )
+    output_summary: Mapped[dict] = mapped_column(
+        JSON, nullable=False, default=dict, server_default="{}"
+    )
+    idempotency_key: Mapped[str | None] = mapped_column(String(150))
+    external_reference: Mapped[str | None] = mapped_column(String(150))
+    error_category: Mapped[str | None] = mapped_column(String(50))
+    retryable: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
     )
 
     execution: Mapped["WorkflowExecution"] = relationship(

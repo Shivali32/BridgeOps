@@ -291,3 +291,22 @@ Compose equivalent: `docker compose --profile app up -d --build fulfillment`.
 The same bounded `/demo/behavior` controls are supported. Fulfillment POST accepts
 `tenant_id`, `order_id`, `reservation_id`, `items`, and `idempotency_key`.
 The returned `accepted` status never represents delivery.
+
+## Process an order (Step 2.6)
+
+`POST /api/v1/tenants/{tenant_id}/orders/{order_id}/process` runs synchronously.
+`GET .../orders/{order_id}/executions` and `GET .../executions/{execution_id}`
+return the persistent execution and its steps. Submitting an order only saves it;
+processing is an explicit action. Repeating process returns the existing execution.
+
+Set `INVENTORY_URL`, `FULFILLMENT_URL` and `PROVIDER_TIMEOUT_SECONDS` in the API
+process if the default loopback ports 8001, 8002 and 3-second timeout do not apply.
+A completed workflow means fulfillment was accepted, not delivered. A fulfillment
+failure after reservation leaves stock reserved. No release/cancel API exists yet.
+Unknown outcomes must be reconciled by the provider's tenant-scoped by-key lookup.
+No blind automatic retries are performed.
+
+The API session factory must use `expire_on_commit=False` so reading identifiers
+does not open implicit transactions between a step commit and an external call.
+A process crash can leave a running execution; repeated process calls intentionally
+return it instead of duplicating work. Recovery controls are a later milestone.

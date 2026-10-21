@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.api.orders import router as orders_router
 from app.api.tenants import router as tenants_router
+from app.api.workflows import router as workflows_router
 from app.db import get_db
 
 DbSession = Annotated[Session, Depends(get_db)]
@@ -19,6 +20,7 @@ app = FastAPI(
 
 app.include_router(tenants_router)
 app.include_router(orders_router)
+app.include_router(workflows_router)
 
 
 @app.get("/health")

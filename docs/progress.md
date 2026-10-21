@@ -181,3 +181,19 @@ Roadmap for this branch supersedes the older roadmap above:
   Compose profile and PostgreSQL duplicate/conflict race tests.
 - Local: 35 passed, 6 PostgreSQL tests skipped; lint/format pass.
 - Accepted fulfillment means provider submission, not delivery.
+
+### Step 2.6
+
+- Synchronous workflow service and process/history/detail APIs now coordinate the
+  inventory and fulfillment HTTP services. Order row locks serialize execution
+  claims. Repeat processing returns the same execution without repeating effects.
+- Step records persist before calls, with no transaction held during HTTP.
+- Provider results, stable keys, references, timestamps and failure categories persist.
+- Timeout/malformed mutation responses become unknown/needs_attention. Completed
+  reservations remain visible if fulfillment fails; no automatic retry is attempted.
+- Added migration, transaction-boundary assertions, failure tests, real HTTP tests
+  for all three FastAPI servers, and a PostgreSQL concurrent workflow-claim test.
+- Local: 46 passed, 7 PostgreSQL tests skipped; lint/format pass. Real HTTP success
+  and timeout-after-provider-commit scenarios passed locally against test SQLite.
+  CI runs those HTTP scenarios against PostgreSQL.
+- Inventory milestone CI passed: https://github.com/Shivali32/BridgeOps/actions/runs/39656503661
