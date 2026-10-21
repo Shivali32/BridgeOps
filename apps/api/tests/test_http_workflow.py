@@ -137,15 +137,18 @@ def test_actual_http_order_workflow(live):
 def test_actual_http_timeout_after_provider_commit(live, monkeypatch, resolution):
     c, inv, ful = live
     tenant_id, url, order, _ = submit(c, inv)
-    monkeypatch.setenv("PROVIDER_TIMEOUT_SECONDS", "0.1")
+    monkeypatch.setenv("PROVIDER_TIMEOUT_SECONDS", "0.2")
     with httpx.Client(trust_env=False) as p:
         p.put(
-            ful + "/demo/behavior", json={"mode": "delay_after", "delay_seconds": 0.3}
+            ful + "/demo/behavior", json={"mode": "delay_after", "delay_seconds": 0.6}
         )
     result = c.post(f"{url}/{order['id']}/process").json()
     assert result["status"] == "needs_attention"
     assert result["steps"][-1]["status"] == "unknown"
     key = result["steps"][-1]["idempotency_key"]
+    # The low timeout only induces the lost-response scenario. Reconciliation
+    # uses the normal production timeout so CI scheduling does not cause noise.
+    monkeypatch.setenv("PROVIDER_TIMEOUT_SECONDS", "3")
     with httpx.Client(trust_env=False) as p:
         provider_record = p.get(
             ful + f"/fulfillment/requests/by-key/{key}", params={"tenant_id": tenant_id}
@@ -163,7 +166,7 @@ def test_actual_http_timeout_after_provider_commit(live, monkeypatch, resolution
             "note": "Check the response lost after acceptance",
         },
     ).json()
-    assert resolved["status"] == "completed"
+    assert resolved["status"] == "completed", resolved
     assert resolved["steps"][-1]["output_summary"]["reconciled"] is True
 
 

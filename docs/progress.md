@@ -355,3 +355,10 @@ Docker smoke CI caught the original fixed-depth .env path assumption in the cont
 layout. Environment-file discovery now searches for the repository marker and leaves
 container-provided environment credentials intact. The demo script uses the same
 safe discovery behavior. Local tests remain 101 passed, 10 PostgreSQL tests skipped.
+
+Container services now start correctly. The next Docker smoke run exposed a startup
+connection reset before Uvicorn was ready. Added explicit provider/API health checks,
+healthy provider dependencies and bounded readiness handling for transient resets.
+The lost-response test also restores the normal provider timeout before reconciliation,
+avoiding a 100ms test-only scheduling race. The HTTP scenarios and full local suite
+passed afterward (101 passed, 10 PostgreSQL tests skipped).

@@ -24,7 +24,7 @@ for _ in range(40):
     try:
         assert call(8000, "/health/db")[0] == 200
         break
-    except URLError:
+    except (URLError, ConnectionError, TimeoutError):
         time.sleep(1)
 else:
     raise RuntimeError("Compose API did not become ready")

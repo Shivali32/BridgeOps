@@ -37,6 +37,11 @@ services:
       ENABLE_DEMO_ADMIN: "true"
     ports:
       - "127.0.0.1:8001:8001"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/health', timeout=3)"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
     depends_on:
       postgres:
         condition: service_healthy
@@ -54,6 +59,11 @@ services:
       ENABLE_DEMO_ADMIN: "true"
     ports:
       - "127.0.0.1:8002:8002"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8002/health', timeout=3)"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
     depends_on:
       postgres:
         condition: service_healthy
@@ -86,13 +96,18 @@ services:
       INGEST_TOKEN: ${INGEST_TOKEN:-}
     ports:
       - "127.0.0.1:8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/db', timeout=3)"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
     depends_on:
       migrate:
         condition: service_completed_successfully
       inventory:
-        condition: service_started
+        condition: service_healthy
       fulfillment:
-        condition: service_started
+        condition: service_healthy
 
 volumes:
   postgres_data:
