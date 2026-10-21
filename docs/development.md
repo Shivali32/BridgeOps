@@ -398,3 +398,37 @@ resolved at processing time. A disabled assigned workflow produces a configurati
 error response instead of silently falling back. Without an assigned/default workflow,
 the built-in standard is used. Rejection stops processing before stock reservation.
 Approvals use self-reported development operator names, not authenticated identities.
+
+## Operations and recovery (Stage 5)
+
+The Operations tab provides tenant-scoped execution filters, pagination, execution
+steps and an audit trail. Status/integration/approval/error filters affect the list.
+Date filters affect the list and summaries. Latest saved orders are shown for all dates.
+Average completed elapsed time includes approval waits. Null means no completed runs.
+
+Endpoints:
+- `GET /operations` with status, integration_id, approval_status, error_category,
+  start, end, limit and offset.
+- `GET /operations/summary` with optional start/end timestamps.
+- `POST /executions/{id}/recovery` with request_key, action, note and
+  development_operator. Actions: retry, reconcile, verify_reference, investigated.
+- `GET /executions/{id}/audit` with limit/offset.
+
+Retry first queries the provider for mutating operations and reuses the original
+business idempotency key. Completed steps are preserved and new attempts are appended.
+The automatic attempt limit is three. A successful provider lookup creates a verified
+attempt without repeating its business effect. A plain reconcile with no provider
+record leaves attention state until an explicit eligible retry. Verify reference also
+checks tenant, key, items and fulfillment references; an arbitrary ID cannot complete
+an execution. Investigation notes do not change workflow status.
+
+Approval pauses/rejections use approval APIs, not recovery. Invalid transformations
+are corrected and reimported as new attempts. Existing stored order contents are
+immutable; conflicting edits require a new source revision identifier. No stock release,
+fulfillment cancellation, authenticated operator identity or real provider credentials
+are implemented.
+
+A running execution cannot be retried. After 60 seconds without progress it may be
+reconciled. Ownership tokens fence stale runners, and provider idempotency still guards
+business effects. A stale run without a persisted external step requires developer
+investigation; there is no unrestricted state override. Demo services are single-worker.

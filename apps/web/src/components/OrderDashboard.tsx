@@ -1,5 +1,6 @@
 import { ExecutionDetails } from './ExecutionDetails'
 export { ExecutionDetails } from './ExecutionDetails'
+import OperationsDashboard from './OperationsDashboard'
 import WorkflowManager from './WorkflowManager'
 import Status from './Status'
 import { useEffect, useState } from 'react'
@@ -112,6 +113,6 @@ export default function OrderDashboard() {
     <p className="local-notice">Local demo. Tenant selection does not provide access control.</p>
     <label className="form-field">Retailer for orders<select value={selected} onChange={e => setSelected(e.target.value)}><option value="">Select a retailer</option>{tenants.map(t => <option key={t.id} value={t.id}>{t.name}{!t.is_active && ' (inactive)'}</option>)}</select></label>
     {error && <p role="alert">{error}</p>}
-    {selected && <><nav className="workspace-nav" aria-label="Retail workspace"><button aria-pressed={tab === 'orders'} onClick={() => setTab('orders')}>Orders</button><button aria-pressed={tab === 'integrations'} onClick={() => setTab('integrations')}>Integrations</button><button aria-pressed={tab === 'workflows'} onClick={() => setTab('workflows')}>Workflows</button></nav>{tab === 'orders' ? <Orders key={selected} tenant={selected} /> : tab === 'integrations' ? <IntegrationManager key={selected} tenant={selected} /> : <WorkflowManager key={selected} tenant={selected} />}</>}
+    {selected && <><nav className="workspace-nav" aria-label="Retail workspace"><button aria-pressed={tab === 'orders'} onClick={() => setTab('orders')}>Orders</button><button aria-pressed={tab === 'integrations'} onClick={() => setTab('integrations')}>Integrations</button><button aria-pressed={tab === 'workflows'} onClick={() => setTab('workflows')}>Workflows</button><button aria-pressed={tab === 'operations'} onClick={() => setTab('operations')}>Operations</button></nav>{tab === 'orders' ? <Orders key={selected} tenant={selected} /> : tab === 'integrations' ? <IntegrationManager key={selected} tenant={selected} /> : tab === 'workflows' ? <WorkflowManager key={selected} tenant={selected} /> : <OperationsDashboard key={selected} tenant={selected} />}</>}
   </section>
 }

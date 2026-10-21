@@ -303,3 +303,7 @@ pre { overflow: auto; max-height: 300px; padding: 14px; background: #f1f5f9; fon
 .workspace-nav { display: flex; gap: 10px; margin: 24px 0; flex-wrap: wrap; }
 .workspace-nav button[aria-pressed="true"] { color: #fff; background: #2563eb; border-color: #2563eb; }
 textarea { width: 100%; resize: vertical; font-family: monospace; }
+.metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin: 24px 0; }
+.metrics-grid > div { display: grid; align-content: start; gap: 10px; border: 1px solid #dbe3ed; border-radius: 10px; padding: 20px; background: #f8fafc; }
+.metrics-grid strong { font-size: 26px; color: #1e40af; }
+.metrics-grid span { color: #475569; font-size: 13px; }

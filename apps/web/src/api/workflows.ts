@@ -14,4 +14,4 @@ export const saveDefinition = (t: string, data: object, id?: string) => request<
 export const getVersions = (t: string, id: string) => request<{ version: number; snapshot: object; created_at: string }[]>(`/tenants/${t}/workflow-definitions/${id}/versions`)
 export const getApprovals = (t: string, status = 'pending', signal?: AbortSignal) => request<Approval[]>(`/tenants/${t}/approvals${status ? '?status=' + status : ''}`, { signal })
 export const decideApproval = (t: string, id: string, decision: string, note: string, operator: string) => request<Execution>(`/tenants/${t}/approvals/${id}/decision`, { method: 'POST', body: JSON.stringify({ decision, note, development_operator: operator }) })
-export const getExecution = (t: string, id: string) => request<Execution>(`/tenants/${t}/executions/${id}`)
+export const getExecution = (t: string, id: string, signal?: AbortSignal) => request<Execution>(`/tenants/${t}/executions/${id}`, { signal })

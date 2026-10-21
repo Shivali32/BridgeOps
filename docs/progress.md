@@ -326,3 +326,14 @@ https://github.com/Shivali32/BridgeOps/actions/runs/39661754013
 - Input quantities now reject booleans and are bounded to protect database integer
   storage. Stock shortages are eligible for controlled retry after replenishment;
   idempotency conflicts are classified separately from insufficient stock.
+
+### Stage 5 React operations workspace
+
+- Added central operations filters, pagination, real summaries, saved-order visibility,
+  execution inspection, step timestamps, input/output summaries and audit history.
+- Recovery controls show eligibility, enforce notes, preserve request keys after lost
+  responses, reconcile uncertain outcomes and verify supplied provider references.
+- Central approval management reuses validated decisions with order/rule context.
+- Frontend: 35 component/API tests passed, lint and production build passed.
+- Browser coverage now includes failure inspection/retry without duplicate reservation;
+  the approval browser scenario now approves through the central operations console.
