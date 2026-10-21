@@ -350,3 +350,8 @@ corrected imports and a separate CI job that builds and starts the actual Compos
 images. A repeatable demo script creates three retailers without resetting orders,
 configurations or stock. Compose smoke/demo verification is pending on this commit.
 Local final backend: 101 passed, 10 PostgreSQL tests skipped; frontend: 35 passed.
+
+Docker smoke CI caught the original fixed-depth .env path assumption in the container
+layout. Environment-file discovery now searches for the repository marker and leaves
+container-provided environment credentials intact. The demo script uses the same
+safe discovery behavior. Local tests remain 101 passed, 10 PostgreSQL tests skipped.

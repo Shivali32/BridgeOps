@@ -8,7 +8,16 @@ from urllib.request import ProxyHandler, Request, build_opener
 
 from dotenv import load_dotenv
 
-load_dotenv(Path(__file__).resolve().parents[3] / ".env")
+project_root = next(
+    (
+        parent
+        for parent in Path(__file__).resolve().parents
+        if (parent / ".env.example").is_file()
+    ),
+    None,
+)
+if project_root is not None:
+    load_dotenv(project_root / ".env")
 api = os.getenv("DEMO_API_URL", "http://127.0.0.1:8000")
 inventory = os.getenv("INVENTORY_URL", "http://127.0.0.1:8001")
 token = os.getenv("INGEST_TOKEN")
@@ -176,7 +185,9 @@ for letter, connector_type in (
         )
         statuses.append(execution["status"])
     if letter == "B":
-        assert statuses[0] in ("needs_attention", "completed"), "Review the existing approval demo state"
+        assert statuses[0] in ("needs_attention", "completed"), (
+            "Review the existing approval demo state"
+        )
     else:
         assert all(s in ("completed", "invalid row recorded") for s in statuses)
     if letter == "C":
