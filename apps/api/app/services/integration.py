@@ -7,7 +7,7 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.connectors import Mapping, connector
+from app.connectors import Mapping, connector, field
 from app.models.integration import ImportRecord, Integration
 from app.schemas.integration import IntegrationCreate, IntegrationUpdate
 from app.services.order import (
@@ -88,7 +88,14 @@ def snapshot(value):
 
 
 def import_one(db, tenant_id, config, payload, row_numbers=None):
+    raw_reference = field(payload, config["mapping"]["external_id"])
+    reference = (
+        str(raw_reference).strip()
+        if isinstance(raw_reference, (str, int)) and not isinstance(raw_reference, bool)
+        else ""
+    )
     record = ImportRecord(
+        source_reference=reference if 1 <= len(reference) <= 100 else None,
         tenant_id=tenant_id,
         integration_id=UUID(config["id"]),
         config_snapshot=config,

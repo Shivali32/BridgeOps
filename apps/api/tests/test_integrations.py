@@ -78,6 +78,7 @@ def test_csv_partial_failures_and_idempotency(api_client, monkeypatch):
     items = results.json()
     assert [x["status"] for x in items] == ["succeeded", "failed", "succeeded"]
     assert items[0]["row_numbers"] == [2, 3] and items[1]["row_numbers"] == [4]
+    assert items[1]["source_reference"] == "CSV-2"
     orders = c.get(base + "/orders").json()
     assert len(orders) == 2
     assert (

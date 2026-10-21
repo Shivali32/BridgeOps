@@ -1,255 +1,140 @@
+# BridgOps architecture through Stage 5
 
-# BridgOps Architecture
+## Components
 
-## 1. Overview
+The existing modular FastAPI application owns tenant administration, canonical
+orders, integration configuration, import tracking, workflow configuration,
+execution state, approvals and recovery. React provides the operator workspace.
 
-BridgOps is a multi-tenant retail integration and workflow platform.
+Inventory and fulfillment are independent FastAPI processes reached through actual
+HTTP calls. They use separate provider tables in the same PostgreSQL database to
+keep the demonstration lightweight. They do not read platform orders or tenants.
+This is an HTTP integration boundary, not independent database infrastructure.
 
-The initial implementation follows a modular monorepo architecture with:
-
-- React + TypeScript frontend
-- FastAPI backend
-- PostgreSQL database
-- Docker Compose for local infrastructure
-- GitHub Actions for continuous integration
-
-The architecture is designed to evolve toward asynchronous workflow execution and independent integration workers.
-
-## 2. Current Architecture
-
-```text
-Browser
-   |
-   v
-React + TypeScript (Vite)
-   |
-   | HTTP / JSON
-   v
-Vite Development Proxy
-   |
-   v
-FastAPI
-   |
-   +--- API Routers
-   |
-   +--- Pydantic Schemas
-   |
-   +--- Service Layer
-   |
-   v
-SQLAlchemy
-   |
-   v
-PostgreSQL (Docker)
+```mermaid
+flowchart TD
+    Browser["React operator workspace"] --> API["FastAPI platform"]
+    API --> DB["PostgreSQL 17"]
+    API --> Inventory["Inventory REST simulator"]
+    API --> Fulfillment["Fulfillment REST simulator"]
+    Inventory --> DB
+    Fulfillment --> DB
 ```
 
-The Vite proxy is used only during local development.
-
-## 3. Backend Responsibilities
-
-### API Layer
-
-Location: `apps/api/app/api/`
-
-Responsible for:
-- HTTP routing
-- Request and response handling
-- Dependency injection
-- HTTP status codes
-- Translating application errors into API responses
-
-### Schema Layer
-
-Location: `apps/api/app/schemas/`
-
-Responsible for:
-- Request validation
-- Response serialization
-- API data contracts
-
-Pydantic is used for validation.
-
-### Service Layer
-
-Location: `apps/api/app/services/`
-
-Responsible for:
-- Business operations
-- Database transactions
-- Tenant creation and updates
-- Database query logic
-
-### Database Models
-
-Location: `apps/api/app/models/`
-
-SQLAlchemy models define database tables and relationships.
-
-The initial model is `Tenant`.
-
-### Database Configuration
-
-Location: `apps/api/app/db.py`
-
-Responsible for:
-- Loading database configuration
-- Creating the SQLAlchemy engine
-- Creating database sessions
-- Managing session cleanup
-
-## 4. Frontend Responsibilities
-
-Location: `apps/web/src/`
-
-### API Client
-
-`src/api/` contains functions for communicating with FastAPI.
-
-### Types
-
-`src/types/` defines TypeScript interfaces matching API contracts.
-
-### Components
-
-`src/components/` contains reusable React UI components.
-
-Current components include:
-- TenantList
-- TenantForm
-
-## 5. Multi-Tenancy
-
-A tenant represents one retail business.
-
-For example:
-- Retailer A
-- Retailer B
-- Retailer C
-
-The initial system uses a shared PostgreSQL database.
-
-Each tenant has a unique UUID and slug.
-
-Future business tables will include tenant ownership identifiers.
-
-Important:
-
-Tenant administration is currently accessible without authentication or authorization.
-
-Tenant-scoped access control, authenticated user identity, and cross-tenant isolation tests must be implemented before public deployment.
-
-## 6. Tenant Request Flow
-
-Example: Create a retailer.
-
-1. User fills out the React form.
-2. React sends POST /api/v1/tenants.
-3. FastAPI validates the request using Pydantic.
-4. The service layer creates a SQLAlchemy Tenant object.
-5. SQLAlchemy commits the transaction to PostgreSQL.
-6. FastAPI returns the created tenant.
-7. React refreshes the tenant list.
-
-## 7. Database Migrations
-
-Alembic manages PostgreSQL schema changes.
-
-Models are defined using SQLAlchemy.
-
-Migration files are stored in:
-
-`apps/api/alembic/versions/`
-
-Schema updates are applied using:
-
-`python -m alembic upgrade head`
-
-Migration files must be reviewed and committed to Git.
-
-## 8. Current Error Handling
-
-The application handles:
-- Invalid tenant data
-- Duplicate tenant slugs
-- Missing tenant records
-- Unavailable API responses
-- Database health failures
-
-More advanced transaction recovery and retry behavior will be implemented later.
-
-## 9. Planned Architecture Evolution
-
-Future stages will add:
-
-- Simulated external REST integrations
-- Order and fulfillment processing
-- Kafka event producers and consumers
-- Asynchronous workflow workers
-- Retry and dead-letter mechanisms
-- Transactional outbox
-- Configurable tenant workflows
-- Prometheus and Grafana
-- Airflow reconciliation
-- Kubernetes deployment
-- Terraform infrastructure
-
-These are planned components, not currently implemented features.
-
-## 10. Key Design Principles
-
-- Start with a modular backend
-- Separate API and business logic
-- Validate data at API boundaries
-- Use database migrations
-- Keep tenant ownership explicit
-- Avoid unnecessary microservices
-- Introduce asynchronous processing for concrete needs
-- Make failures observable and recoverable
-- Prioritize maintainability over tool count
-
-
-
-## Stage 2: Order and Workflow Data Model
-
-The order-processing system introduces four tables:
-
-- orders
-- order_items
-- workflow_executions
-- step_executions
-
-### Relationships
-
-- One tenant can own multiple orders.
-- One order contains multiple order items.
-- One order can have multiple workflow executions.
-- One workflow execution contains multiple step executions.
-
-### Tenant Ownership
-
-Orders reference the owning tenant through tenant_id.
-
-Workflow executions use a composite foreign key on
-(order_id, tenant_id) to prevent referencing orders owned
-by another tenant.
-
-### Data Integrity
-
-Database constraints enforce:
-
-- Unique external order IDs within each tenant
-- Unique SKUs within an order
-- Positive item quantities
-- Non-negative optional prices
-- Allowed status values
-- Valid foreign-key relationships
-
-### Current Scope
-
-These models provide persistent storage for order processing.
-
-Order APIs, inventory integrations, fulfillment integrations,
-and workflow orchestration will be implemented in subsequent
-Stage 2 steps.
-
-Authentication and authorization are not yet implemented.
+The Vite development proxy forwards /api requests to the platform. Compose publishes
+ports only on 127.0.0.1. Alembic runs before the Compose API starts.
+
+## Canonical orders and connectors
+
+`app/connectors` contains a protocol, explicit registry and controlled mapping code.
+Shopify-style payloads use id/line_items/price; custom REST uses
+reference/products/price_cents; CSV groups flat rows by order reference.
+All produce the existing Pydantic OrderCreate schema and use the same order service.
+
+Mappings support dotted dictionary paths, defaults, identifier trimming and exact
+Decimal conversion. There is no eval, arbitrary expression execution or dynamic
+plugin loading. CSV input is bounded to 256 KiB, 500 rows and 100 order groups.
+An invalid item rejects its complete order group; other valid groups are preserved.
+
+Orders have unique (tenant_id, external_order_id), positive quantities, distinct
+SKUs per order and optional non-negative prices. Equivalent duplicate submissions
+reuse the original order. Conflicting contents return a conflict. Existing order
+contents remain immutable. Failed transformations can be corrected and reimported.
+
+Integration updates require the expected configuration version. Import records
+persist before processing and preserve a configuration snapshot, digest, source
+reference, row numbers and success/failure state. Raw provider payloads and tokens
+are not retained. A crash may leave a pending import requiring investigation.
+
+## Workflow definitions and rules
+
+Definitions contain ordered, validated steps: condition, approval, inventory_check,
+inventory_reservation and fulfillment_request. Exactly one check/reservation/fulfillment
+sequence is required, and approval steps precede reservation. Branches only reference
+earlier conditions, so loops and forward references cannot be configured.
+
+Rules compare exact Decimal order totals, quantities, SKU membership and source
+fields using explicit operators. Groups support all/any. All configured rule inputs
+must be available. Missing prices never silently become zero.
+
+The supported trigger is an explicit order_processing request. Saving or importing
+an order does not start execution automatically. The runner resolves an integration
+assignment, then a retailer default, then the built-in standard. Disabled assigned
+workflows fail selection. The first successful import supplies source provenance.
+
+Each execution snapshots its definition/version, source context and order values.
+Changing configuration never changes how a paused execution resumes. Immutable
+workflow version rows support inspection of prior configurations.
+
+## Persistence and transaction boundaries
+
+There are 15 application/provider tables plus Alembic's version table. Business
+relationships use tenant ownership and composite foreign keys where appropriate.
+Tenant filtering is data scoping, not authenticated user authorization.
+
+Concurrency controls:
+
+| Operation | Protection |
+|---|---|
+| Order creation | Tenant/external-ID uniqueness and specific conflict recovery |
+| Initial workflow claim | Order row lock and existing-execution check |
+| Inventory reservation | Persistent tenant/key uniqueness; sorted stock row locks |
+| Fulfillment request | Persistent tenant/key uniqueness and payload comparison |
+| Approval decision | Execution row lock, valid state transitions and decision replay |
+| Recovery | Execution lock, request-key replay, attempt uniqueness and ownership token |
+
+A step is committed as running before each HTTP request. No transaction remains
+open during the external call. The production session factory uses
+expire_on_commit=False. Results and references are committed afterward. Tests assert
+transaction boundaries and use real HTTP servers, not only mocked calls.
+
+A completed workflow means the provider accepted fulfillment. It does not prove
+shipment or delivery. Reservation success followed by fulfillment failure keeps the
+reservation and marks the order as needing attention.
+
+## Approval and failure states
+
+Existing order/workflow/step constraints are preserved. Waiting approvals use
+needs_attention with approval_pending, and the approval step is pending. Decisions
+persist reason, note, timestamp and an explicitly unverified development operator.
+Rejection stops the workflow before stock is reserved.
+
+Known failures and uncertain outcomes are distinguished. A lost/malformed response
+to a mutating request becomes an unknown step and attention state. Error categories
+include validation_error, insufficient_stock, provider_rejected,
+provider_unavailable, timeout_unknown, authorization_error and approval states.
+Provider response bodies and credential headers are not exposed as diagnostics.
+
+## Recovery and audit
+
+Manual recovery accepts a request key and a note. Same-key/same-payload requests
+return existing execution state; conflicting reuse is rejected. Completed steps
+remain intact and new step attempts are appended.
+
+Before retrying a business write, recovery checks the provider's tenant-scoped
+idempotency-key lookup. A matching result is verified against tenant, key, items and
+fulfillment references, then recorded without repeating the write. Supplied external
+references undergo the same validation. No unrestricted mark-completed action exists.
+An absent result after plain reconciliation leaves attention state until an explicit
+eligible retry. Further submissions stop at the three-attempt limit.
+
+Investigation notes preserve state. Approval decisions and recovery actions produce
+audit events with before/after state and development attribution. Invalid source
+inputs are corrected and imported as new attempts, without overwriting order history.
+
+A running execution requires 60 seconds without progress before reconciliation.
+Each owner has a token. An older runner checks ownership before storing results and
+cannot overwrite a newer recovery. Stable provider keys also guard concurrent
+business effects. Stale runs without a persisted external step require investigation.
+
+## Security and deliberate limits
+
+This is a trusted-local demonstration. Tenant selection and self-reported operator
+names do not establish identity or permissions. Ingestion uses a development token
+from the environment, not ordinary integration database fields. Management and
+provider demo controls are not safe to expose publicly.
+
+No live provider accounts, payment processing, stock release, fulfillment cancellation,
+background queue, Kafka, Kubernetes, Redis, Airflow or cloud deployment are included.
+The provider failure simulators are single-worker process-local controls; actual stock,
+reservations and fulfillment state are persistent.

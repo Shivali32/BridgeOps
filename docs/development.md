@@ -1,434 +1,214 @@
+# BridgOps development and safe Windows update
 
-# BridgOps Development Setup
+This version is a trusted-local demonstration. Use Docker Desktop with WSL 2,
+Python 3.12, Node.js 22 and Git. The existing project can remain at `D:\BridgOps`.
 
-## 1. Prerequisites
+## 1. Safely get the completed branch
 
-Install:
-
-- Git
-- Python 3.12
-- Node.js 22
-- Docker Desktop
-- Docker Compose
-
-Windows with PowerShell and WSL 2 is the primary local development environment.
-
-## 2. Clone the Repository
+Run in PowerShell. This stops if local changes need to be saved; it never discards them.
 
 ```powershell
-git clone https://github.com/YOUR_USERNAME/BridgOps.git
-cd BridgOps
+Set-Location D:\BridgOps
+git status --short
+$pendingChanges = git status --porcelain
+if ($LASTEXITCODE -ne 0) { throw "Could not inspect the repository." }
+if ($pendingChanges) { throw "Save local changes with a commit or stash before switching branches." }
+
+git fetch origin
+if ($LASTEXITCODE -ne 0) { throw "Git fetch failed." }
+$targetBranch = "work/bridgops-stage2-to-stage5"
+git show-ref --verify --quiet "refs/heads/$targetBranch"
+if ($LASTEXITCODE -eq 0) {
+    git switch $targetBranch
+    if ($LASTEXITCODE -ne 0) { throw "Branch switch failed." }
+    git merge --ff-only "origin/$targetBranch"
+} else {
+    git switch --track -c $targetBranch "origin/$targetBranch"
+}
+if ($LASTEXITCODE -ne 0) { throw "Review the Git result before continuing." }
 ```
 
-Replace YOUR_USERNAME with the actual GitHub username.
+If you have local changes, commit them on your current branch or use
+`git stash push -u -m "Before BridgOps Stage 5 update"`, then rerun the block.
+Keep the stash until you have reviewed whether those changes are still needed.
+Do not blindly apply old changes over the completed implementation. No merge to
+main, forced update, branch deletion or database reset is required.
 
-## 3. Configure Environment Variables
-
-From the repository root:
+## 2. Preserve and configure the environment
 
 ```powershell
-Copy-Item .env.example .env
+Set-Location D:\BridgOps
+if (-not (Test-Path .env)) { Copy-Item .env.example .env }
+notepad .env
 ```
 
-Edit `.env`:
+Keep existing PostgreSQL credentials when reusing the current Docker volume.
+Ensure `.env` contains POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB and INGEST_TOKEN.
+Use a local token of your choice; do not commit it. Changing .env does not change
+an existing PostgreSQL user's password. Do not delete the database volume to fix credentials.
 
-```dotenv
-POSTGRES_USER=bridgops
-POSTGRES_PASSWORD=your_local_password
-POSTGRES_DB=bridgops_db
-```
+## 3. Start PostgreSQL and apply migrations
 
-Choose your own local development password.
-
-Do not commit `.env` to Git.
-
-Important: PostgreSQL initializes its database credentials when its data directory is first created.
-
-Changing the password in `.env` later does not automatically change an existing PostgreSQL user's password.
-
-## 4. Start PostgreSQL
-
-Make sure Docker Desktop is running.
-
-From the repository root:
+The app profile applies migrations automatically. To also set up your host Python
+environment for tests and development, run:
 
 ```powershell
+Set-Location D:\BridgOps
 docker compose up -d postgres
-```
-
-Check the container:
-
-```powershell
 docker compose ps
-```
-
-Expected: PostgreSQL is healthy.
-
-Database connection:
-- Host: localhost
-- Windows port: 5433
-- Container port: 5432
-- Database: bridgops_db
-
-## 5. Set Up the Backend
-
-Open a PowerShell terminal:
-
-```powershell
-cd apps\api
+Set-Location apps\api
 py -3.12 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe -m alembic upgrade head
+.\.venv\Scripts\python.exe -m alembic current
 ```
 
-Activate the virtual environment:
+The expected migration head is `7af6_operations`. Eight migrations preserve the
+existing tenant/order migration history. No table recreation or volume deletion is needed.
+
+## 4. Start the API and supporting services
+
+Recommended: run all backend services through Compose.
 
 ```powershell
-.\.venv\Scripts\Activate.ps1
+Set-Location D:\BridgOps
+docker compose --profile app up -d --build
+docker compose --profile app ps
+Invoke-RestMethod http://127.0.0.1:8000/health/db
 ```
 
-Install dependencies:
+The profile includes PostgreSQL, the migration job, API, inventory and fulfillment.
+Published ports bind to 127.0.0.1. The migration container exits successfully after
+applying migrations. Provider tables share the physical database for this local demo.
+
+Alternatively, leave only PostgreSQL in Docker and start these commands in three
+separate PowerShell terminals from `D:\BridgOps\apps\api`:
 
 ```powershell
-python -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe -m uvicorn app.main:app --reload --port 8000
 ```
 
-If PowerShell blocks activation, use a process-scoped execution policy:
-
 ```powershell
-Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+$env:ENABLE_DEMO_ADMIN = "true"
+.\.venv\Scripts\python.exe -m uvicorn app.providers.inventory:app --port 8001
 ```
 
-Then retry activation.
-
-## 6. Apply Database Migrations
-
-From `apps/api`:
-
 ```powershell
-python -m alembic upgrade head
+$env:ENABLE_DEMO_ADMIN = "true"
+.\.venv\Scripts\python.exe -m uvicorn app.providers.fulfillment:app --port 8002
 ```
 
-Check the applied migration:
+Use one backend mode at a time so ports are not claimed twice. Host defaults use
+localhost:5433. POSTGRES_HOST/POSTGRES_PORT override these values. INVENTORY_URL,
+FULFILLMENT_URL and PROVIDER_TIMEOUT_SECONDS configure trusted outbound endpoints
+and the default three-second timeout. Provider failure controls are single-worker.
+
+## 5. Start React
+
+In another PowerShell terminal:
 
 ```powershell
-python -m alembic current
-```
-
-Do not manually recreate application tables.
-
-## 7. Start FastAPI
-
-From `apps/api`:
-
-```powershell
-python -m uvicorn app.main:app --reload
-```
-
-The backend runs at:
-
-http://127.0.0.1:8000
-
-API documentation:
-
-http://127.0.0.1:8000/docs
-
-Health checks:
-
-http://127.0.0.1:8000/health
-
-http://127.0.0.1:8000/health/db
-
-## 8. Set Up the Frontend
-
-Open another PowerShell terminal.
-
-Navigate to the frontend:
-
-```powershell
-cd apps\web
-```
-
-Install dependencies:
-
-```powershell
+Set-Location D:\BridgOps\apps\web
 npm.cmd ci
-```
-
-Start Vite:
-
-```powershell
 npm.cmd run dev
 ```
 
-Open:
+Open http://localhost:5173. Vite proxies /api to the API on port 8000.
+Swagger is available on ports 8000, 8001 and 8002 at /docs.
 
-http://localhost:5173
+## 6. Seed the three-retailer demo
 
-Vite forwards `/api` requests to FastAPI through the development proxy.
-
-FastAPI must be running for API-backed frontend functionality.
-
-## 9. Run Backend Tests
-
-From `apps/api`:
+With the Compose stack running:
 
 ```powershell
-python -m pytest -v
+Set-Location D:\BridgOps
+docker compose --profile app exec -T api python scripts/demo.py
 ```
 
-The current tenant API tests use a temporary SQLite database.
-
-They do not require a running PostgreSQL container.
-
-## 10. Run Frontend Tests
-
-From `apps/web`:
+With host Python services:
 
 ```powershell
+Set-Location D:\BridgOps\apps\api
+.\.venv\Scripts\python.exe scripts/demo.py
+```
+
+The script creates/reuses three demo retailers and their integrations. It initializes
+only missing stock, reuses existing orders and leaves prior configurations unchanged.
+Retailer A completes a Shopify-style order, B waits for approval on a $600 REST
+order, and C imports valid CSV orders while preserving an invalid-row result.
+Refreshing retailer choices makes them available in React. See [demo.md](demo.md).
+
+## 7. Run checks
+
+```powershell
+Set-Location D:\BridgOps\apps\api
+.\.venv\Scripts\python.exe -m pytest -v
+.\.venv\Scripts\python.exe -m ruff check app tests scripts
+.\.venv\Scripts\python.exe -m ruff format --check app tests scripts
+```
+
+Without TEST_DATABASE_URL, PostgreSQL concurrency tests are explicitly skipped.
+HTTP tests still start real HTTP servers, using an isolated temporary SQLite file.
+CI runs these HTTP tests against PostgreSQL as well.
+
+To run PostgreSQL tests locally, create a dedicated database once:
+
+```powershell
+Set-Location D:\BridgOps
+docker compose exec -T postgres sh -c 'createdb -U "$POSTGRES_USER" bridgops_test'
+```
+
+If the database already exists, keep it. From apps/api, this command constructs
+its URL using your existing credentials without printing them:
+
+```powershell
+Set-Location D:\BridgOps\apps\api
+.\.venv\Scripts\python.exe -c "import os,subprocess,sys; from app.db import DATABASE_URL; os.environ['TEST_DATABASE_URL']=DATABASE_URL.set(database='bridgops_test').render_as_string(hide_password=False); sys.exit(subprocess.call([sys.executable,'-m','pytest','-v']))"
+```
+
+PostgreSQL fixtures create and drop their own random schemas. Do not point tests
+at an external production database. SQLite tests do not prove PostgreSQL concurrency.
+
+Frontend:
+
+```powershell
+Set-Location D:\BridgOps\apps\web
 npm.cmd run test
 npm.cmd run lint
 npm.cmd run build
 ```
 
-Frontend component tests use mocked API functions.
-
-## 11. Verify Tenant Management
-
-Start PostgreSQL, FastAPI, and React.
-
-Open the frontend and:
-
-1. Create a retailer.
-2. Verify it appears in the list.
-3. Edit the retailer name.
-4. Try creating a duplicate slug.
-5. Deactivate the retailer.
-6. Refresh the browser and verify the status persists.
-
-## 12. Stop the Services
-
-Stop the FastAPI and Vite development servers with Ctrl+C.
-
-From the repository root:
+Browser tests require all three HTTP services and an isolated demonstration database.
+The CSV browser test expects INGEST_TOKEN=ci_local_ingestion_token on that isolated
+API. Do not replace a normal local token merely to run tests against valuable data.
+CI provisions the isolated environment automatically.
 
 ```powershell
-docker compose down
+npm.cmd exec playwright install chromium
+npm.cmd exec playwright test
 ```
 
-This stops and removes the Compose containers and network while preserving the database volume.
-
-Do not use `docker compose down -v` unless you intentionally want to delete the database volume.
-
-## 13. Common Issues
-
-### ModuleNotFoundError: No module named 'app'
-
-Run Uvicorn from `apps/api`.
-
-### npm.ps1 is blocked
-
-Use `npm.cmd` in PowerShell.
-
-### Database connection fails
-
-Verify:
-- Docker Desktop is running
-- PostgreSQL is healthy
-- Port 5433 is accessible
-- `.env` credentials match PostgreSQL
-
-### Frontend API request fails
-
-Check:
-- FastAPI is running on port 8000
-- Vite is running on port 5173
-- `vite.config.ts` contains the development proxy
-
-### Migration fails
-
-Check PostgreSQL connectivity and inspect the migration error before changing the database.
-
-## 14. Security Notes
-
-- Do not commit secrets.
-- Do not expose tenant administration endpoints publicly.
-- Do not use local database credentials in production.
-- Authentication and tenant authorization are not yet implemented.
-
-## Simulated inventory (Step 2.4)
-
-After applying migrations, run from `apps/api` in another terminal:
+## 8. Stop without deleting data
 
 ```powershell
-$env:ENABLE_DEMO_ADMIN = "true"
-python -m uvicorn app.providers.inventory:app --port 8001
+Set-Location D:\BridgOps
+docker compose --profile app down
 ```
 
-Or build the Compose inventory service with `docker compose --profile app up -d --build inventory`.
-This service uses the same physical database for a lightweight demo, but separate
-provider tables and HTTP APIs. It does not read the platform's orders or tenants.
-All published ports bind to loopback. Do not expose this unauthenticated demo.
+Stop host Uvicorn/Vite processes with Ctrl+C when using them. Do not add `-v`
+unless you intentionally want to delete the PostgreSQL volume.
 
-`PUT http://127.0.0.1:8001/inventory/stock` accepts a tenant UUID, sku and available
-quantity. `PUT /demo/behavior` accepts mode (`normal`, `unavailable`, `delay_before`,
-`delay_after`), remaining (0 to 100) and delay_seconds (0 to 10). These controls
-require ENABLE_DEMO_ADMIN=true. `delay_after` commits before delaying the response,
-so callers must reconcile the outcome instead of assuming failure.
+## Troubleshooting
 
-The simulator controls are process-local and intended for a single Uvicorn worker.
-Reservations and stock are persistent. API requests accept `tenant_id` in JSON;
-lookups require `tenant_id` as a query parameter. See each service's `/docs`.
-
-## Simulated fulfillment (Step 2.5)
-
-In a separate backend virtual-environment terminal:
-
-```powershell
-$env:ENABLE_DEMO_ADMIN = "true"
-python -m uvicorn app.providers.fulfillment:app --port 8002
-```
-
-Compose equivalent: `docker compose --profile app up -d --build fulfillment`.
-The same bounded `/demo/behavior` controls are supported. Fulfillment POST accepts
-`tenant_id`, `order_id`, `reservation_id`, `items`, and `idempotency_key`.
-The returned `accepted` status never represents delivery.
-
-## Process an order (Step 2.6)
-
-`POST /api/v1/tenants/{tenant_id}/orders/{order_id}/process` runs synchronously.
-`GET .../orders/{order_id}/executions` and `GET .../executions/{execution_id}`
-return the persistent execution and its steps. Submitting an order only saves it;
-processing is an explicit action. Repeating process returns the existing execution.
-
-Set `INVENTORY_URL`, `FULFILLMENT_URL` and `PROVIDER_TIMEOUT_SECONDS` in the API
-process if the default loopback ports 8001, 8002 and 3-second timeout do not apply.
-A completed workflow means fulfillment was accepted, not delivered. A fulfillment
-failure after reservation leaves stock reserved. No release/cancel API exists yet.
-Unknown outcomes must be reconciled by the provider's tenant-scoped by-key lookup.
-No blind automatic retries are performed.
-
-The API session factory must use `expire_on_commit=False` so reading identifiers
-does not open implicit transactions between a step commit and an external call.
-A process crash can leave a running execution; repeated process calls intentionally
-return it instead of duplicating work. Recovery controls are a later milestone.
-
-## React order demonstration
-
-Open http://localhost:5173, refresh retailer choices and select a retailer under
-Order processing. Create stock for that tenant using the inventory service first.
-Save an order, then click its Process button. View shows items, execution steps,
-timestamps, requests/results and provider references. Refresh orders reloads states.
-Prices remain decimal strings across the browser/API boundary. Orders are scoped
-by tenant; selecting a tenant is not authentication.
-
-## Integrations and imports (Stage 3)
-
-Set `INGEST_TOKEN` in the repository `.env` to a local value and restart the API.
-Do not commit that value. Configuration endpoints are for trusted local use only.
-
-Use `/api/v1/tenants/{tenant_id}/connectors` to inspect built-in field mappings.
-`POST /integrations` creates a name, connector_type, enabled flag and optional
-mapping. `PATCH /integrations/{id}` takes the complete settings plus
-expected_version, rejecting stale updates. Connector type is immutable.
-
-For `shopify_simulated`, send `{id, line_items: [{sku, quantity, price}]}`.
-For `custom_rest`, send `{reference, products: [{product_code, count, price_cents}]}`.
-Both use `POST /integrations/{id}/ingest` with `X-Development-Token`.
-For `csv`, `POST /integrations/{id}/csv` accepts `{csv_text: "..."}` and the same
-header. Default columns: order_reference, product_code, qty, unit_price. Multiple
-rows with the same order_reference form one order. A bad item fails its full order
-group, while other groups are saved. The response identifies every group's rows.
-Imports save orders; processing stays an explicit action in Stage 3.
-
-`GET /imports?limit=50&offset=0` provides persistent results. Failed imports can
-be corrected and submitted again as new import attempts. Successful duplicate
-submissions reuse the same order. Import snapshots remain unchanged after updates.
-Custom mappings accept dotted dictionary paths, defaults and Decimal cents conversion.
-CSV mappings use flat columns and a synthetic items collection named rows.
-Provider secrets and outbound URLs are not accepted in these configuration objects.
-These simulated incoming adapters do not poll live Shopify or other provider APIs.
-
-## Start the full local stack
-
-With Docker Desktop running, configure `.env`, including INGEST_TOKEN. From the root:
-
-```powershell
-docker compose --profile app up -d --build
-cd apps\web
-npm.cmd ci
-npm.cmd run dev
-```
-
-The app profile runs Alembic before the API. It preserves the existing PostgreSQL
-volume. Do not run a second host API on port 8000 at the same time. The React
-Integrations tab supports creation, versioned editing, mappings, enable/disable,
-sample provider JSON, CSV file upload and result history. Enter your local token
-only in the import form; it is kept in component memory and not browser storage.
-
-A manual backend virtual-environment workflow remains supported by the earlier
-instructions. To execute PostgreSQL tests locally, create a dedicated test database
-and set TEST_DATABASE_URL to its SQLAlchemy `postgresql+psycopg://...` URL. Tests
-create/drop random test schemas there. Never point test configuration at production.
-
-Browser verification uses `npx playwright install chromium` then
-`npx playwright test` from apps/web, with all HTTP services already running.
-The CSV browser scenario expects INGEST_TOKEN=ci_local_ingestion_token on its
-isolated demo API. Do not use that documented test token on an exposed service.
-
-## Workflow definitions and approvals (Stage 4)
-
-Use Workflows in the retailer workspace to create a standard workflow or a high-value
-approval preset. Set Default for this retailer or assign the workflow to an integration.
-An explicit Process action is the supported trigger (`order_processing`); saving or
-importing an order does not automatically execute it. All processing stays synchronous.
-
-Endpoints under `/api/v1/tenants/{tenant_id}`:
-- `/workflow-definitions` GET/POST; `/{definition_id}` PATCH with expected_version.
-- `/workflow-definitions/{definition_id}/versions` GET.
-- `/approvals?status=pending` GET; `/approvals/{approval_id}/decision` POST.
-
-Rules compare exact Decimal totals/quantities, SKU membership and source fields.
-Groups support all/any. Every rule input must be available; missing prices never
-become zero. Conditional approval branches reference an earlier condition by ID.
-Provider steps are check/reserve/fulfill exactly once, in that order. Approvals
-must occur before reservation. There are no loops or executable user expressions.
-
-A running/paused execution keeps its definition and source snapshot, even after edits.
-The first successful import supplies source provenance. Integration assignments are
-resolved at processing time. A disabled assigned workflow produces a configuration
-error response instead of silently falling back. Without an assigned/default workflow,
-the built-in standard is used. Rejection stops processing before stock reservation.
-Approvals use self-reported development operator names, not authenticated identities.
-
-## Operations and recovery (Stage 5)
-
-The Operations tab provides tenant-scoped execution filters, pagination, execution
-steps and an audit trail. Status/integration/approval/error filters affect the list.
-Date filters affect the list and summaries. Latest saved orders are shown for all dates.
-Average completed elapsed time includes approval waits. Null means no completed runs.
-
-Endpoints:
-- `GET /operations` with status, integration_id, approval_status, error_category,
-  start, end, limit and offset.
-- `GET /operations/summary` with optional start/end timestamps.
-- `POST /executions/{id}/recovery` with request_key, action, note and
-  development_operator. Actions: retry, reconcile, verify_reference, investigated.
-- `GET /executions/{id}/audit` with limit/offset.
-
-Retry first queries the provider for mutating operations and reuses the original
-business idempotency key. Completed steps are preserved and new attempts are appended.
-The automatic attempt limit is three. A successful provider lookup creates a verified
-attempt without repeating its business effect. A plain reconcile with no provider
-record leaves attention state until an explicit eligible retry. Verify reference also
-checks tenant, key, items and fulfillment references; an arbitrary ID cannot complete
-an execution. Investigation notes do not change workflow status.
-
-Approval pauses/rejections use approval APIs, not recovery. Invalid transformations
-are corrected and reimported as new attempts. Existing stored order contents are
-immutable; conflicting edits require a new source revision identifier. No stock release,
-fulfillment cancellation, authenticated operator identity or real provider credentials
-are implemented.
-
-A running execution cannot be retried. After 60 seconds without progress it may be
-reconciled. Ownership tokens fence stale runners, and provider idempotency still guards
-business effects. A stale run without a persisted external step requires developer
-investigation; there is no unrestricted state override. Demo services are single-worker.
+- Run backend commands from apps/api. Do not change application imports to mask
+  a wrong working directory.
+- Use npm.cmd when PowerShell blocks npm.ps1.
+- If a port is occupied, stop the other host/container process before restarting.
+- If ingestion returns 403, check INGEST_TOKEN and the form's development-token field.
+- If a workflow waits for approval, use Workflows or Operations to decide it.
+- A completed workflow means provider acceptance, not delivery.
+- A fulfillment failure keeps the reservation. Use controlled recovery rather than
+  submitting another order with changed contents under the same external ID.
+- A lost response is uncertain. Reconcile the provider outcome before retrying.
+- A running execution requires 60 seconds without progress before stale reconciliation.
+- No authentication or tenant authorization exists. Keep this version local.
