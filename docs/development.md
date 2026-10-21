@@ -253,3 +253,27 @@ Check PostgreSQL connectivity and inspect the migration error before changing th
 - Do not expose tenant administration endpoints publicly.
 - Do not use local database credentials in production.
 - Authentication and tenant authorization are not yet implemented.
+
+## Simulated inventory (Step 2.4)
+
+After applying migrations, run from `apps/api` in another terminal:
+
+```powershell
+$env:ENABLE_DEMO_ADMIN = "true"
+python -m uvicorn app.providers.inventory:app --port 8001
+```
+
+Or build the Compose inventory service with `docker compose --profile app up -d --build inventory`.
+This service uses the same physical database for a lightweight demo, but separate
+provider tables and HTTP APIs. It does not read the platform's orders or tenants.
+All published ports bind to loopback. Do not expose this unauthenticated demo.
+
+`PUT http://127.0.0.1:8001/inventory/stock` accepts a tenant UUID, sku and available
+quantity. `PUT /demo/behavior` accepts mode (`normal`, `unavailable`, `delay_before`,
+`delay_after`), remaining (0 to 100) and delay_seconds (0 to 10). These controls
+require ENABLE_DEMO_ADMIN=true. `delay_after` commits before delaying the response,
+so callers must reconcile the outcome instead of assuming failure.
+
+The simulator controls are process-local and intended for a single Uvicorn worker.
+Reservations and stock are persistent. API requests accept `tenant_id` in JSON;
+lookups require `tenant_id` as a query parameter. See each service's `/docs`.

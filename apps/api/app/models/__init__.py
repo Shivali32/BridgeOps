@@ -9,3 +9,6 @@ __all__ = [
     "Tenant",
     "WorkflowExecution",
 ]
+
+# Register the independent demo providers' tables for Alembic.
+from app.providers.models import Reservation, Stock  # noqa: F401

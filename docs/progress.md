@@ -160,3 +160,15 @@ routes that were absent from the repository. Stage 1 baseline: 24 backend tests,
 Roadmap for this branch supersedes the older roadmap above:
 2 synchronous workflows; 3 connectors/mappings; 4 configurable workflows/approvals;
 5 operations/recovery; 6 Kafka (deferred). No authentication or authorization yet.
+
+### Step 2.4
+
+- Independent inventory HTTP service on 8001 with PostgreSQL-backed stock and
+  reservations. A sorted row-lock sequence prevents overselling; the idempotency
+  key is claimed before stock changes. Failed multi-item reservations roll back.
+- Added reconciliation lookup by tenant and idempotency key.
+- Development-only stock setup and bounded failure/delay controls.
+- Added Compose app profile, backend Dockerfile and Alembic migration.
+- Local: 34 passed, 4 PostgreSQL tests skipped; lint and format pass.
+- Step 2.3D CI passed both jobs, including migrations and PostgreSQL races:
+  https://github.com/Shivali32/BridgeOps/actions/runs/39656158054
