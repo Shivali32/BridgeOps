@@ -14,6 +14,7 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    func,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.types import Uuid
@@ -84,6 +85,10 @@ class WorkflowExecution(Base):
         nullable=True,
     )
 
+    run_token: Mapped[uuid.UUID | None] = mapped_column(Uuid)
+    heartbeat_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
     definition_snapshot: Mapped[dict] = mapped_column(
         JSON, nullable=False, default=dict, server_default="{}"
     )
@@ -104,6 +109,9 @@ class StepExecution(Base):
     __tablename__ = "step_executions"
 
     __table_args__ = (
+        UniqueConstraint(
+            "execution_id", "step_name", "attempt_number", name="uq_step_attempt"
+        ),
         CheckConstraint(
             "attempt_number > 0",
             name="ck_step_executions_attempt",

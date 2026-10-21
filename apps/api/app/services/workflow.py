@@ -1,5 +1,5 @@
 from datetime import UTC, datetime
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
@@ -141,15 +141,17 @@ def process_order(db: Session, tenant_id: UUID, order_id: UUID, providers: Provi
         tenant_id=tenant_id,
         order_id=order_id,
         status="running",
+        run_token=uuid4(),
+        heartbeat_at=now(),
         started_at=now(),
         definition_snapshot=snapshot,
     )
     order.status = "processing"
     db.add(execution)
     db.flush()
-    execution_id = execution.id
+    execution_id, claim_token = execution.id, execution.run_token
     db.commit()
-    return run_execution(db, tenant_id, execution_id, providers)
+    return run_execution(db, tenant_id, execution_id, providers, claim_token)
 
 
 def fail_step(db, execution, order, step, exc, reserved):
@@ -171,7 +173,7 @@ def fail_step(db, execution, order, step, exc, reserved):
     db.commit()
 
 
-def run_execution(db, tenant_id, execution_id, providers):
+def run_execution(db, tenant_id, execution_id, providers, claim_token):
     """Only called after a committed exclusive claim by process/decision/retry."""
     execution = get_execution(db, tenant_id, execution_id)
     order = db.scalar(
@@ -210,6 +212,9 @@ def run_execution(db, tenant_id, execution_id, providers):
         None,
     )
     for spec in specs:
+        if not owns_execution(db, tenant_id, execution_id, claim_token):
+            return get_execution(db, tenant_id, execution_id)
+        execution.heartbeat_at = now()
         previous = latest.get(spec.id)
         if previous and previous.status in ("completed", "skipped"):
             continue
@@ -273,8 +278,13 @@ def run_execution(db, tenant_id, execution_id, providers):
                 else providers.call(spec.type, payload)
             )
         except ProviderError as exc:
+            if not owns_execution(db, tenant_id, execution_id, claim_token):
+                return get_execution(db, tenant_id, execution_id)
             fail_step(db, execution, order, step, exc, reservation_id)
             return get_execution(db, tenant_id, execution_id)
+        if not owns_execution(db, tenant_id, execution_id, claim_token):
+            return get_execution(db, tenant_id, execution_id)
+        execution.heartbeat_at = now()
         step.status, step.completed_at = "completed", now()
         step.output_summary = result
         results[spec.id] = result
@@ -332,6 +342,10 @@ def decide_approval(db, tenant_id, approval_id, data, providers):
         .limit(1)
     )
     order = db.get(Order, execution.order_id)
+    previous_approval_state = {
+        "status": execution.status,
+        "approval_status": approval.status,
+    }
     approval.status, approval.decided_at = decision, now()
     approval.decision_note, approval.development_operator = (
         data.note,
@@ -349,6 +363,8 @@ def decide_approval(db, tenant_id, approval_id, data, providers):
     }
     execution.error_message = execution.error_category = None
     execution_id = execution.id
+    execution.run_token, execution.heartbeat_at = uuid4(), now()
+    claim_token = execution.run_token
     if decision == "rejected":
         execution.status = order.status = "failed"
         execution.completed_at = now()
@@ -356,9 +372,37 @@ def decide_approval(db, tenant_id, approval_id, data, providers):
         execution.error_message = step.error_message = "Operator rejected the order."
     else:
         execution.status, order.status = "running", "processing"
+    from app.models.operations import AuditEvent
+
+    db.add(
+        AuditEvent(
+            tenant_id=tenant_id,
+            execution_id=execution_id,
+            action="approval_decision",
+            previous_state=previous_approval_state,
+            new_state={"status": execution.status, "approval_status": decision},
+            note=data.note,
+            development_operator=data.development_operator,
+        )
+    )
     db.commit()
     return (
-        run_execution(db, tenant_id, execution_id, providers)
+        run_execution(db, tenant_id, execution_id, providers, claim_token)
         if decision == "approved"
         else get_execution(db, tenant_id, execution_id)
     )
+
+
+def owns_execution(db, tenant_id, execution_id, claim_token):
+    token = db.scalar(
+        select(WorkflowExecution.run_token)
+        .where(
+            WorkflowExecution.id == execution_id,
+            WorkflowExecution.tenant_id == tenant_id,
+        )
+        .with_for_update()
+    )
+    if token != claim_token:
+        db.rollback()
+        return False
+    return True

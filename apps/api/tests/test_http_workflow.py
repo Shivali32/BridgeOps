@@ -154,6 +154,16 @@ def test_actual_http_timeout_after_provider_commit(live, monkeypatch):
             == "accepted"
         )
     assert c.post(f"{url}/{order['id']}/process").json()["id"] == result["id"]
+    resolved = c.post(
+        f"/api/v1/tenants/{tenant_id}/executions/{result['id']}/recovery",
+        json={
+            "request_key": "reconcile-http",
+            "action": "reconcile",
+            "note": "Check the response lost after acceptance",
+        },
+    ).json()
+    assert resolved["status"] == "completed"
+    assert resolved["steps"][-1]["output_summary"]["reconciled"] is True
 
 
 def test_actual_http_three_retailer_imports(live, monkeypatch):
@@ -246,3 +256,40 @@ def test_actual_http_approval_pause_and_resume(live):
         base + f"/approvals/{approval['id']}/decision", json={"decision": "approve"}
     ).json()
     assert again["id"] == resumed["id"]
+
+
+def test_actual_http_fulfillment_retry_preserves_reservation(live):
+    c, inv, ful = live
+    tenant_id, url, order, _ = submit(c, inv)
+    with httpx.Client(trust_env=False) as p:
+        p.put(ful + "/demo/behavior", json={"mode": "unavailable", "remaining": 1})
+    failed = c.post(url + f"/{order['id']}/process").json()
+    assert failed["status"] == "failed"
+    reserved = failed["steps"][1]["external_reference"]
+    base = f"/api/v1/tenants/{tenant_id}"
+    payload = {
+        "request_key": "retry-http-1",
+        "action": "retry",
+        "note": "Provider is available again",
+    }
+    recovered = c.post(base + f"/executions/{failed['id']}/recovery", json=payload)
+    assert recovered.status_code == 200
+    result = recovered.json()
+    assert result["status"] == "completed"
+    assert result["steps"][1]["external_reference"] == reserved
+    assert (
+        len([s for s in result["steps"] if s["step_name"] == "inventory_reservation"])
+        == 1
+    )
+    assert (
+        c.post(base + f"/executions/{failed['id']}/recovery", json=payload).json()["id"]
+        == failed["id"]
+    )
+    with httpx.Client(trust_env=False) as p:
+        check = p.post(
+            inv + "/inventory/check",
+            json={"tenant_id": tenant_id, "items": [{"sku": "A", "quantity": 3}]},
+        ).json()
+        assert check["items"][0]["available"] == 3
+    assert c.get(base + "/operations/summary").json()["retry_requests"] == 1
+    assert len(c.get(base + f"/executions/{failed['id']}/audit").json()) >= 1

@@ -47,13 +47,21 @@ class Providers:
             if response.status_code >= 500:
                 category = "provider_unavailable"
             elif step == "inventory_reservation" and response.status_code == 409:
-                category = "insufficient_stock"
+                try:
+                    if (
+                        response.json().get("detail", {}).get("code")
+                        == "insufficient_stock"
+                    ):
+                        category = "insufficient_stock"
+                except (ValueError, TypeError, AttributeError):
+                    pass
             elif response.status_code in (401, 403):
                 category = "authorization_error"
             raise ProviderError(
                 category,
                 f"Provider returned HTTP {response.status_code}.",
-                retryable=response.status_code >= 500,
+                retryable=response.status_code >= 500
+                or category == "insufficient_stock",
             )
         try:
             result = response.json()
@@ -61,8 +69,13 @@ class Providers:
                 if type(result["available"]) is not bool:
                     raise ValueError
                 if not result["available"]:
+                    missing = any(
+                        i.get("available") is None for i in result.get("items", [])
+                    )
                     raise ProviderError(
-                        "insufficient_stock", "Missing SKU or insufficient stock."
+                        "validation_error" if missing else "insufficient_stock",
+                        "Unknown SKU." if missing else "Insufficient stock.",
+                        retryable=not missing,
                     )
             else:
                 UUID(result["id"])
@@ -82,6 +95,68 @@ class Providers:
                 "Invalid provider response.",
                 unknown=mutation,
                 retryable=mutation,
+            ) from None
+
+    def lookup(self, step: str, payload: dict, reference=None):
+        from urllib.parse import quote
+
+        base, path = (
+            (self.inventory, "/inventory/reservations")
+            if step == "inventory_reservation"
+            else (self.fulfillment, "/fulfillment/requests")
+        )
+        suffix = (
+            "/" + str(reference)
+            if reference
+            else "/by-key/" + quote(payload["idempotency_key"], safe="")
+        )
+        try:
+            with httpx.Client(
+                timeout=self.timeout, trust_env=False, transport=self.transport
+            ) as client:
+                response = client.get(
+                    base + path + suffix, params={"tenant_id": payload["tenant_id"]}
+                )
+        except httpx.RequestError:
+            raise ProviderError(
+                "timeout_unknown",
+                "Provider reconciliation unavailable; outcome remains uncertain.",
+                unknown=True,
+                retryable=True,
+            ) from None
+        if response.status_code == 404:
+            return None
+        if response.status_code != 200:
+            raise ProviderError(
+                "provider_unavailable",
+                f"Reconciliation returned HTTP {response.status_code}.",
+                unknown=True,
+                retryable=True,
+            )
+        try:
+            result = response.json()
+            UUID(result["id"])
+            expected = "reserved" if step == "inventory_reservation" else "accepted"
+            if (
+                result["tenant_id"] != payload["tenant_id"]
+                or result["idempotency_key"] != payload["idempotency_key"]
+                or result["status"] != expected
+            ):
+                raise ValueError
+            if sorted(result["items"], key=lambda i: i["sku"]) != sorted(
+                payload["items"], key=lambda i: i["sku"]
+            ):
+                raise ValueError
+            if step == "fulfillment_request" and any(
+                result[k] != payload[k] for k in ("order_id", "reservation_id")
+            ):
+                raise ValueError
+            return result
+        except (ValueError, KeyError, TypeError, AttributeError):
+            raise ProviderError(
+                "provider_rejected",
+                "Provider reference does not match this operation.",
+                unknown=True,
             ) from None
 
 

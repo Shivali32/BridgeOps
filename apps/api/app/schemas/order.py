@@ -12,14 +12,23 @@ from pydantic import (
 
 
 class OrderItemCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     sku: str = Field(min_length=1, max_length=100)
-    quantity: int = Field(gt=0)
+    quantity: int = Field(gt=0, le=1_000_000)
     unit_price: Decimal | None = Field(
         default=None,
         ge=0,
         max_digits=12,
         decimal_places=2,
     )
+
+    @field_validator("quantity", mode="before")
+    @classmethod
+    def reject_boolean_quantity(cls, value):
+        if isinstance(value, bool):
+            # Pydantic wraps ValueError as a 422; TypeError would escape as a 500.
+            raise ValueError("Quantity must be a whole number, not a boolean")  # noqa: TRY004
+        return value
 
     @field_validator("sku")
     @classmethod
@@ -33,6 +42,7 @@ class OrderItemCreate(BaseModel):
 
 
 class OrderCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     external_order_id: str = Field(
         min_length=1,
         max_length=100,

@@ -94,7 +94,7 @@ def list_orders(
         select(Order)
         .options(selectinload(Order.items))
         .where(Order.tenant_id == tenant_id)
-        .order_by(Order.id)
+        .order_by(Order.created_at.desc(), Order.id)
         .limit(limit)
         .offset(offset)
     )

@@ -117,7 +117,9 @@ def reserve(data: ReservationCreate, result: Response, db: DbSession):
             if stock is None:
                 raise HTTPException(422, f"Unknown SKU: {item['sku']}")
             if stock.available < item["quantity"]:
-                raise HTTPException(409, "Insufficient stock")
+                raise HTTPException(
+                    409, {"code": "insufficient_stock", "message": "Insufficient stock"}
+                )
             stock.available -= item["quantity"]
         db.commit()
     except IntegrityError as exc:

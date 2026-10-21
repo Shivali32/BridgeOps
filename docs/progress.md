@@ -301,3 +301,28 @@ https://github.com/Shivali32/BridgeOps/actions/runs/39659555088
 Stage 4 browser test correction: CI exposed an ambiguous test locator matching both
 Save workflow and Save workflow assignment. The test now selects the exact button
 name. PostgreSQL/backend checks and both earlier browser journeys passed.
+
+### Stage 4 verified
+
+PostgreSQL, backend checks, frontend checks and all three browser journeys passed:
+https://github.com/Shivali32/BridgeOps/actions/runs/39661754013
+
+### Stage 5 backend: operations, recovery and audit
+
+- Added tenant-scoped execution filtering, pagination, date ranges and real database
+  summaries for orders, executions, approvals, import failures, retries and elapsed time.
+- Added persistent recovery request keys, audit history, step-attempt uniqueness,
+  execution ownership tokens and progress timestamps through Alembic.
+- Eligible retries reconcile external writes first, preserve completed steps and
+  stable business keys, and stop after three attempts. Unknown outcomes can be
+  reconciled or matched to a supplied verified external reference.
+- Investigation notes preserve state. No unrestricted mark-completed action exists.
+- Stale running steps require reconciliation after 60 seconds. Ownership fencing
+  prevents an older runner from overwriting a newer recovery's state.
+- Approval decisions also record audit events. Operator attribution remains unverified.
+- Added real HTTP failure/retry and timeout/reconciliation tests, retry concurrency
+  tests, manual-resolution tests and summary/filter/scoping checks.
+- Local: 98 backend tests passed, 10 PostgreSQL tests skipped; lint/format passed.
+- Input quantities now reject booleans and are bounded to protect database integer
+  storage. Stock shortages are eligible for controlled retry after replenishment;
+  idempotency conflicts are classified separately from insufficient stock.

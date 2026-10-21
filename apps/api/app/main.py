@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.api.definitions import router as definitions_router
 from app.api.integrations import router as integrations_router
+from app.api.operations import router as operations_router
 from app.api.orders import router as orders_router
 from app.api.tenants import router as tenants_router
 from app.api.workflows import router as workflows_router
@@ -33,6 +34,7 @@ app.include_router(orders_router)
 app.include_router(workflows_router)
 app.include_router(integrations_router)
 app.include_router(definitions_router)
+app.include_router(operations_router)
 
 
 async def domain_error(request: Request, exc: Exception):
