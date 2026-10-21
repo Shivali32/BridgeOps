@@ -1,0 +1,255 @@
+
+# BridgOps Development Setup
+
+## 1. Prerequisites
+
+Install:
+
+- Git
+- Python 3.12
+- Node.js 22
+- Docker Desktop
+- Docker Compose
+
+Windows with PowerShell and WSL 2 is the primary local development environment.
+
+## 2. Clone the Repository
+
+```powershell
+git clone https://github.com/YOUR_USERNAME/BridgOps.git
+cd BridgOps
+```
+
+Replace YOUR_USERNAME with the actual GitHub username.
+
+## 3. Configure Environment Variables
+
+From the repository root:
+
+```powershell
+Copy-Item .env.example .env
+```
+
+Edit `.env`:
+
+```dotenv
+POSTGRES_USER=bridgops
+POSTGRES_PASSWORD=your_local_password
+POSTGRES_DB=bridgops_db
+```
+
+Choose your own local development password.
+
+Do not commit `.env` to Git.
+
+Important: PostgreSQL initializes its database credentials when its data directory is first created.
+
+Changing the password in `.env` later does not automatically change an existing PostgreSQL user's password.
+
+## 4. Start PostgreSQL
+
+Make sure Docker Desktop is running.
+
+From the repository root:
+
+```powershell
+docker compose up -d postgres
+```
+
+Check the container:
+
+```powershell
+docker compose ps
+```
+
+Expected: PostgreSQL is healthy.
+
+Database connection:
+- Host: localhost
+- Windows port: 5433
+- Container port: 5432
+- Database: bridgops_db
+
+## 5. Set Up the Backend
+
+Open a PowerShell terminal:
+
+```powershell
+cd apps\api
+py -3.12 -m venv .venv
+```
+
+Activate the virtual environment:
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+```
+
+Install dependencies:
+
+```powershell
+python -m pip install -r requirements.txt
+```
+
+If PowerShell blocks activation, use a process-scoped execution policy:
+
+```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+```
+
+Then retry activation.
+
+## 6. Apply Database Migrations
+
+From `apps/api`:
+
+```powershell
+python -m alembic upgrade head
+```
+
+Check the applied migration:
+
+```powershell
+python -m alembic current
+```
+
+Do not manually recreate application tables.
+
+## 7. Start FastAPI
+
+From `apps/api`:
+
+```powershell
+python -m uvicorn app.main:app --reload
+```
+
+The backend runs at:
+
+http://127.0.0.1:8000
+
+API documentation:
+
+http://127.0.0.1:8000/docs
+
+Health checks:
+
+http://127.0.0.1:8000/health
+
+http://127.0.0.1:8000/health/db
+
+## 8. Set Up the Frontend
+
+Open another PowerShell terminal.
+
+Navigate to the frontend:
+
+```powershell
+cd apps\web
+```
+
+Install dependencies:
+
+```powershell
+npm.cmd ci
+```
+
+Start Vite:
+
+```powershell
+npm.cmd run dev
+```
+
+Open:
+
+http://localhost:5173
+
+Vite forwards `/api` requests to FastAPI through the development proxy.
+
+FastAPI must be running for API-backed frontend functionality.
+
+## 9. Run Backend Tests
+
+From `apps/api`:
+
+```powershell
+python -m pytest -v
+```
+
+The current tenant API tests use a temporary SQLite database.
+
+They do not require a running PostgreSQL container.
+
+## 10. Run Frontend Tests
+
+From `apps/web`:
+
+```powershell
+npm.cmd run test
+npm.cmd run lint
+npm.cmd run build
+```
+
+Frontend component tests use mocked API functions.
+
+## 11. Verify Tenant Management
+
+Start PostgreSQL, FastAPI, and React.
+
+Open the frontend and:
+
+1. Create a retailer.
+2. Verify it appears in the list.
+3. Edit the retailer name.
+4. Try creating a duplicate slug.
+5. Deactivate the retailer.
+6. Refresh the browser and verify the status persists.
+
+## 12. Stop the Services
+
+Stop the FastAPI and Vite development servers with Ctrl+C.
+
+From the repository root:
+
+```powershell
+docker compose down
+```
+
+This stops and removes the Compose containers and network while preserving the database volume.
+
+Do not use `docker compose down -v` unless you intentionally want to delete the database volume.
+
+## 13. Common Issues
+
+### ModuleNotFoundError: No module named 'app'
+
+Run Uvicorn from `apps/api`.
+
+### npm.ps1 is blocked
+
+Use `npm.cmd` in PowerShell.
+
+### Database connection fails
+
+Verify:
+- Docker Desktop is running
+- PostgreSQL is healthy
+- Port 5433 is accessible
+- `.env` credentials match PostgreSQL
+
+### Frontend API request fails
+
+Check:
+- FastAPI is running on port 8000
+- Vite is running on port 5173
+- `vite.config.ts` contains the development proxy
+
+### Migration fails
+
+Check PostgreSQL connectivity and inspect the migration error before changing the database.
+
+## 14. Security Notes
+
+- Do not commit secrets.
+- Do not expose tenant administration endpoints publicly.
+- Do not use local database credentials in production.
+- Authentication and tenant authorization are not yet implemented.
