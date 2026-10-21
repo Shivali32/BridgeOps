@@ -70,6 +70,40 @@ jobs:
       - name: Check Python formatting
         run: python -m ruff format --check app tests
 
+      - name: Set up Node for browser verification
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+
+      - name: Install browser test dependencies
+        working-directory: apps/web
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Run browser workflow against PostgreSQL and HTTP services
+        env:
+          ENABLE_DEMO_ADMIN: "true"
+        run: |
+          python -m uvicorn app.main:app --port 8000 > /tmp/bridgops-api.log 2>&1 &
+          python -m uvicorn app.providers.inventory:app --port 8001 > /tmp/bridgops-inventory.log 2>&1 &
+          python -m uvicorn app.providers.fulfillment:app --port 8002 > /tmp/bridgops-fulfillment.log 2>&1 &
+          curl --retry 10 --retry-connrefused --retry-delay 1 --fail http://127.0.0.1:8000/health
+          curl --retry 10 --retry-connrefused --retry-delay 1 --fail http://127.0.0.1:8001/health
+          curl --retry 10 --retry-connrefused --retry-delay 1 --fail http://127.0.0.1:8002/health
+          cd ../web
+          npx playwright test
+
+      - name: Save browser evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-workflow-evidence
+          path: apps/web/test-results
+          retention-days: 7
+
 
   frontend:
     name: Frontend Tests and Build

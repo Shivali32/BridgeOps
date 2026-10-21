@@ -220,3 +220,10 @@ Roadmap for this branch supersedes the older roadmap above:
   defaults and exact Decimal cents conversion. No eval, dynamic loading or secrets.
 - Added equivalence, nested mapping, invalid configuration, duplicate SKU, missing
   field, malformed quantity and decimal edge-case tests.
+
+### Browser verification infrastructure
+
+- Added Playwright with a real browser order-submission/processing scenario and
+  CI evidence upload. CI starts all three HTTP services against PostgreSQL.
+- Browser download in Work returned invalid archives, so local browser execution
+  is blocked. Component tests, lint and build still pass. CI browser result pending.
