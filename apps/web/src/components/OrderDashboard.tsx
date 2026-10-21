@@ -1,3 +1,6 @@
+import { ExecutionDetails } from './ExecutionDetails'
+export { ExecutionDetails } from './ExecutionDetails'
+import WorkflowManager from './WorkflowManager'
 import Status from './Status'
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
@@ -7,25 +10,6 @@ import { createOrder, getOrders, getExecutions, processOrder } from '../api/orde
 import { errorMessage } from '../api/client'
 import type { Tenant } from '../types/tenant'
 import type { Execution, Order } from '../types/order'
-
-export function ExecutionDetails({ execution }: { execution: Execution }) {
-  return <article className="execution-card">
-    <h4>Execution <code>{execution.id}</code></h4>
-    <p><Status value={execution.status} /> · {String(execution.definition_snapshot.name)} · version {String(execution.definition_snapshot.version)}</p>
-    <p>Started: {execution.started_at ? new Date(execution.started_at).toLocaleString() : 'Pending'}<br />
-      Finished: {execution.completed_at ? new Date(execution.completed_at).toLocaleString() : 'Not finished'}</p>
-    {execution.error_message && <p role="alert">{execution.error_category}: {execution.error_message}</p>}
-    <ol className="step-list">{execution.steps.map(step => <li key={step.id}>
-      <strong>{step.step_name.replaceAll('_', ' ')}</strong> <Status value={step.status} />
-      <span>Attempt {step.attempt_number}</span>
-      {step.external_reference && <p>Provider reference: <code>{step.external_reference}</code></p>}
-      {step.error_message && <p className="error-message">{step.error_category}: {step.error_message}</p>}
-      {step.status === 'unknown' && <p>Outcome is uncertain. Check the provider before retrying.</p>}
-      <details><summary>Request and result</summary><pre>{JSON.stringify({ input: step.input_summary, output: step.output_summary }, null, 2)}</pre></details>
-    </li>)}</ol>
-    {execution.status === 'completed' && <p>Fulfillment request accepted. Delivery is outside this workflow.</p>}
-  </article>
-}
 
 
 function OrderForm({ tenant, onSaved }: { tenant: string; onSaved: () => void }) {
@@ -128,6 +112,6 @@ export default function OrderDashboard() {
     <p className="local-notice">Local demo. Tenant selection does not provide access control.</p>
     <label className="form-field">Retailer for orders<select value={selected} onChange={e => setSelected(e.target.value)}><option value="">Select a retailer</option>{tenants.map(t => <option key={t.id} value={t.id}>{t.name}{!t.is_active && ' (inactive)'}</option>)}</select></label>
     {error && <p role="alert">{error}</p>}
-    {selected && <><nav className="workspace-nav" aria-label="Retail workspace"><button aria-pressed={tab === 'orders'} onClick={() => setTab('orders')}>Orders</button><button aria-pressed={tab === 'integrations'} onClick={() => setTab('integrations')}>Integrations</button></nav>{tab === 'orders' ? <Orders key={selected} tenant={selected} /> : <IntegrationManager key={selected} tenant={selected} />}</>}
+    {selected && <><nav className="workspace-nav" aria-label="Retail workspace"><button aria-pressed={tab === 'orders'} onClick={() => setTab('orders')}>Orders</button><button aria-pressed={tab === 'integrations'} onClick={() => setTab('integrations')}>Integrations</button><button aria-pressed={tab === 'workflows'} onClick={() => setTab('workflows')}>Workflows</button></nav>{tab === 'orders' ? <Orders key={selected} tenant={selected} /> : tab === 'integrations' ? <IntegrationManager key={selected} tenant={selected} /> : <WorkflowManager key={selected} tenant={selected} />}</>}
   </section>
 }

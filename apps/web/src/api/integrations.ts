@@ -6,7 +6,7 @@ export interface Mapping {
 export interface ConnectorInfo { type: string; default_mapping: Mapping }
 export interface Integration {
   id: string; tenant_id: string; name: string; connector_type: string; enabled: boolean
-  version: number; mapping: Mapping; created_at: string
+  version: number; workflow_id?: string | null; mapping: Mapping; created_at: string
 }
 export interface ImportResult {
   id: string; integration_id: string; order_id: string | null; source_reference: string | null

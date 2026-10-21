@@ -288,3 +288,12 @@ https://github.com/Shivali32/BridgeOps/actions/runs/39659555088
   by self-reported development operator names.
 - Local backend: 85 passed, 8 PostgreSQL tests skipped; lint/format pass. Includes
   real HTTP approval pause/resume and PostgreSQL conflicting-decision coverage.
+
+### Step 4.6
+
+- React workflow editor supports standard/approval presets, thresholds, explicit
+  JSON step definitions, enabled/default settings, versions and integration assignment.
+- Approval interface supports pending/history filters, order/rule context, approve,
+  reject, decision notes and honest unverified local attribution.
+- Frontend: 28 tests passed, lint/build passed. Backend: 85 passed locally,
+  8 PostgreSQL concurrency tests skipped. Added a real browser approval journey.

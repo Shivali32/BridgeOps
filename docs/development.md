@@ -373,3 +373,28 @@ Browser verification uses `npx playwright install chromium` then
 `npx playwright test` from apps/web, with all HTTP services already running.
 The CSV browser scenario expects INGEST_TOKEN=ci_local_ingestion_token on its
 isolated demo API. Do not use that documented test token on an exposed service.
+
+## Workflow definitions and approvals (Stage 4)
+
+Use Workflows in the retailer workspace to create a standard workflow or a high-value
+approval preset. Set Default for this retailer or assign the workflow to an integration.
+An explicit Process action is the supported trigger (`order_processing`); saving or
+importing an order does not automatically execute it. All processing stays synchronous.
+
+Endpoints under `/api/v1/tenants/{tenant_id}`:
+- `/workflow-definitions` GET/POST; `/{definition_id}` PATCH with expected_version.
+- `/workflow-definitions/{definition_id}/versions` GET.
+- `/approvals?status=pending` GET; `/approvals/{approval_id}/decision` POST.
+
+Rules compare exact Decimal totals/quantities, SKU membership and source fields.
+Groups support all/any. Every rule input must be available; missing prices never
+become zero. Conditional approval branches reference an earlier condition by ID.
+Provider steps are check/reserve/fulfill exactly once, in that order. Approvals
+must occur before reservation. There are no loops or executable user expressions.
+
+A running/paused execution keeps its definition and source snapshot, even after edits.
+The first successful import supplies source provenance. Integration assignments are
+resolved at processing time. A disabled assigned workflow produces a configuration
+error response instead of silently falling back. Without an assigned/default workflow,
+the built-in standard is used. Rejection stops processing before stock reservation.
+Approvals use self-reported development operator names, not authenticated identities.

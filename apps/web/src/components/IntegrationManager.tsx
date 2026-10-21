@@ -14,7 +14,7 @@ function IntegrationEditor({ tenant, connectors, value, onSaved }: { tenant: str
   const [busy, setBusy] = useState(false)
   async function save(e: FormEvent) {
     e.preventDefault(); setBusy(true); setError('')
-    try { await saveIntegration(tenant, { name, connector_type: type, enabled, mapping, ...(value && { expected_version: value.version }) }, value?.id); onSaved() }
+    try { await saveIntegration(tenant, { name, connector_type: type, enabled, mapping, ...(value && { expected_version: value.version, ...(value.workflow_id && { workflow_id: value.workflow_id }) }) }, value?.id); onSaved() }
     catch (e) { setError(errorMessage(e)) } finally { setBusy(false) }
   }
   return <form className="tenant-form" aria-label="Integration configuration" onSubmit={e => void save(e)}>
