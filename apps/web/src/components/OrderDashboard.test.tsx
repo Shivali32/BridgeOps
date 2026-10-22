@@ -20,6 +20,20 @@ beforeEach(() => {
 })
 
 describe('Order workspace', () => {
+  it('shows queued work and refreshes it to completion automatically', async () => {
+    const queued = { ...execution, status: 'pending', error_message: null, error_category: null, steps: [] }
+    vi.mocked(getOrders).mockResolvedValueOnce([order]).mockResolvedValue([{ ...order, status: 'queued' }])
+    vi.mocked(processOrder).mockResolvedValue(queued)
+    vi.mocked(getExecutions).mockResolvedValue([queued])
+    const user = userEvent.setup()
+    render(<Orders tenant="tenant-1" />)
+    await user.click(await screen.findByRole('button', { name: 'Process WEB-1' }))
+    expect(await screen.findByText(/Queued for background processing/)).toBeInTheDocument()
+    vi.mocked(getOrders).mockResolvedValue([{ ...order, status: 'completed' }])
+    vi.mocked(getExecutions).mockResolvedValue([{ ...queued, status: 'completed' }])
+    expect(await screen.findByText(/Fulfillment request accepted/, {}, { timeout: 4000 })).toBeInTheDocument()
+    expect(screen.queryByText(/Queued for background processing/)).not.toBeInTheDocument()
+  })
   it('submits multiple items using strings for prices', async () => {
     const user = userEvent.setup()
     render(<Orders tenant="tenant-1" />)

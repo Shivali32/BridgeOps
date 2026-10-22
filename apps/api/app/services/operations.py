@@ -76,7 +76,12 @@ def list_operations(
             )
         )
     query = (
-        dates(query, WorkflowExecution.started_at, start, end)
+        dates(
+            query,
+            func.coalesce(WorkflowExecution.started_at, WorkflowExecution.created_at),
+            start,
+            end,
+        )
         .order_by(WorkflowExecution.started_at.desc(), WorkflowExecution.id)
         .limit(limit)
         .offset(offset)
@@ -152,7 +157,7 @@ def summary(db, tenant_id, start=None, end=None):
     )
     return {
         "orders": counts(Order, Order.created_at),
-        "executions": counts(WorkflowExecution, WorkflowExecution.started_at),
+        "executions": counts(WorkflowExecution, WorkflowExecution.created_at),
         "pending_approvals": count(
             Approval, Approval.created_at, Approval.status == "pending"
         ),

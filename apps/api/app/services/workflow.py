@@ -117,7 +117,9 @@ def resolve_snapshot(db, tenant_id, order):
     return snapshot
 
 
-def process_order(db: Session, tenant_id: UUID, order_id: UUID, providers: Providers):
+def process_order(
+    db: Session, tenant_id: UUID, order_id: UUID, providers: Providers, *, queued=False
+):
     require_tenant(db, tenant_id, active=True)
     order = db.scalar(
         select(Order)
@@ -150,7 +152,14 @@ def process_order(db: Session, tenant_id: UUID, order_id: UUID, providers: Provi
     db.add(execution)
     db.flush()
     execution_id, claim_token = execution.id, execution.run_token
+    if queued:
+        from app.messaging.contracts import enqueue
+
+        execution.started_at = None
+        enqueue(db, execution)
     db.commit()
+    if queued:
+        return get_execution(db, tenant_id, execution_id)
     return run_execution(db, tenant_id, execution_id, providers, claim_token)
 
 
@@ -300,7 +309,7 @@ def run_execution(db, tenant_id, execution_id, providers, claim_token):
     return get_execution(db, tenant_id, execution_id)
 
 
-def decide_approval(db, tenant_id, approval_id, data, providers):
+def decide_approval(db, tenant_id, approval_id, data, providers, *, queued=False):
     require_tenant(db, tenant_id, active=True)
     approval = db.scalar(
         select(Approval).where(
@@ -385,7 +394,13 @@ def decide_approval(db, tenant_id, approval_id, data, providers):
             development_operator=data.development_operator,
         )
     )
+    if queued and decision == "approved":
+        from app.messaging.contracts import enqueue
+
+        enqueue(db, execution)
     db.commit()
+    if queued:
+        return get_execution(db, tenant_id, execution_id)
     return (
         run_execution(db, tenant_id, execution_id, providers, claim_token)
         if decision == "approved"

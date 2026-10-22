@@ -94,6 +94,7 @@ services:
       INVENTORY_URL: http://inventory:8001
       FULFILLMENT_URL: http://fulfillment:8002
       INGEST_TOKEN: ${INGEST_TOKEN:-}
+      WORKFLOW_MODE: kafka
     ports:
       - "127.0.0.1:8000:8000"
     healthcheck:
@@ -109,5 +110,81 @@ services:
       fulfillment:
         condition: service_healthy
 
+  kafka:
+    image: apache/kafka:4.2.2
+    profiles: [app]
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:9092:9092"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: INTERNAL://:19092,HOST://:9092,CONTROLLER://:19093
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:19092,HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,HOST:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:19093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+      KAFKA_LOG_DIRS: /tmp/kraft-combined-logs
+      KAFKA_HEAP_OPTS: -Xms256m -Xmx512m
+      CLUSTER_ID: 4L6g3nShT-eMCtK--X86sw
+    volumes:
+      - kafka_data:/tmp/kraft-combined-logs
+    healthcheck:
+      test: ["CMD", "/opt/kafka/bin/kafka-topics.sh", "--bootstrap-server", "kafka:19092", "--list"]
+      interval: 5s
+      timeout: 10s
+      retries: 20
+
+  kafka-init:
+    image: apache/kafka:4.2.2
+    profiles: [app]
+    entrypoint: /opt/kafka/bin/kafka-topics.sh
+    command: --bootstrap-server kafka:19092 --create --if-not-exists --topic bridgops.workflow.commands.v1 --partitions 3 --replication-factor 1
+    depends_on:
+      kafka:
+        condition: service_healthy
+
+  publisher:
+    build: ./apps/api
+    profiles: [app]
+    restart: unless-stopped
+    command: python -m app.messaging.publisher
+    environment: &worker_environment
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      KAFKA_BOOTSTRAP_SERVERS: kafka:19092
+      INVENTORY_URL: http://inventory:8001
+      FULFILLMENT_URL: http://fulfillment:8002
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      kafka-init:
+        condition: service_completed_successfully
+
+  worker:
+    build: ./apps/api
+    profiles: [app]
+    restart: unless-stopped
+    command: python -m app.messaging.worker
+    environment: *worker_environment
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      kafka-init:
+        condition: service_completed_successfully
+      inventory:
+        condition: service_healthy
+      fulfillment:
+        condition: service_healthy
+
 volumes:
   postgres_data:
+  kafka_data:

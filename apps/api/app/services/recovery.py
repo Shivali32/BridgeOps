@@ -31,7 +31,7 @@ def audit(db, execution, action, previous, note, operator):
     )
 
 
-def recover(db, tenant_id, execution_id, data, providers):
+def recover(db, tenant_id, execution_id, data, providers, *, queued=False):
     require_tenant(db, tenant_id, active=True)
     execution = db.scalar(
         select(WorkflowExecution)
@@ -137,14 +137,14 @@ def recover(db, tenant_id, execution_id, data, providers):
         raise WorkflowConflictError(
             "Inventory checks have no external reservation to reconcile."
         )
-    db.add(
-        RecoveryRequest(
-            tenant_id=tenant_id,
-            execution_id=execution_id,
-            request_key=data.request_key,
-            payload=payload,
-        )
+    request = RecoveryRequest(
+        tenant_id=tenant_id,
+        execution_id=execution_id,
+        request_key=data.request_key,
+        payload=payload,
     )
+    db.add(request)
+    db.flush()
     execution.status, execution.error_message, execution.error_category = (
         "running",
         None,
@@ -166,8 +166,39 @@ def recover(db, tenant_id, execution_id, data, providers):
         data.note,
         data.development_operator,
     )
+    if queued:
+        from app.messaging.contracts import enqueue
+
+        enqueue(
+            db,
+            execution,
+            kind="recover",
+            recovery_request_id=request.id,
+            step_id=step.id,
+            step_kind=kind,
+        )
+    db.commit()
+    if queued:
+        return get_execution(db, tenant_id, execution_id)
+    return continue_recovery(db, execution, step, kind, data, providers, claim_token)
+
+
+def continue_recovery(db, execution, step, kind, data, providers, claim_token):
+    tenant_id, execution_id = execution.tenant_id, execution.id
+    order = db.get(Order, execution.order_id)
+    # A redelivered recovery may already have persisted the successful lookup.
+    completed = db.scalar(
+        select(StepExecution.id).where(
+            StepExecution.execution_id == execution_id,
+            StepExecution.step_name == step.step_name,
+            StepExecution.status == "completed",
+            StepExecution.attempt_number >= step.attempt_number,
+        )
+    )
     operation_payload = dict(step.input_summary)
     db.commit()
+    if completed:
+        return run_execution(db, tenant_id, execution_id, providers, claim_token)
     result = None
     if kind != "inventory_check":
         try:

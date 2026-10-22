@@ -446,3 +446,60 @@ def test_grocery_seed_preserves_edited_integration(live, monkeypatch):
     with pytest.raises(RuntimeError, match="was edited"):
         demo.seed_store(STORES[0])
     assert c.get(base + "/integrations").json()[0]["enabled"] is False
+
+
+def test_queued_http_worker_and_recovery_preserve_stock(live, monkeypatch):
+    import json
+
+    from sqlalchemy import select
+
+    from app.messaging.worker import handle_message
+    from app.models.messaging import EventReceipt, OutboxEvent
+
+    c, inv, ful = live
+    monkeypatch.setenv("WORKFLOW_MODE", "kafka")
+    tenant_id, url, order, _ = submit(c, inv)
+    with httpx.Client(trust_env=False) as provider:
+        provider.put(
+            ful + "/demo/behavior", json={"mode": "unavailable", "remaining": 1}
+        )
+    response = c.post(url + f"/{order['id']}/process")
+    assert response.status_code == 202 and response.json()["status"] == "pending"
+    with contextmanager(api.dependency_overrides[get_db])() as db:
+        event = db.scalar(select(OutboxEvent))
+        raw = json.dumps(event.payload).encode()
+        assert handle_message(db, raw, ("work", 0, 0))
+        assert db.get(EventReceipt, event.id)
+    execution_id = response.json()["id"]
+    base = f"/api/v1/tenants/{tenant_id}"
+    assert c.get(base + f"/executions/{execution_id}").json()["status"] == "failed"
+    recovered = c.post(
+        base + f"/executions/{execution_id}/recovery",
+        json={
+            "request_key": "queued-retry",
+            "action": "retry",
+            "note": "Fulfillment restored",
+        },
+    )
+    assert recovered.status_code == 202
+    with contextmanager(api.dependency_overrides[get_db])() as db:
+        event = db.scalar(
+            select(OutboxEvent).where(
+                ~OutboxEvent.id.in_(select(EventReceipt.event_id))
+            )
+        )
+        raw = json.dumps(event.payload).encode()
+        assert handle_message(db, raw, ("work", 0, 1))
+        assert handle_message(db, raw, ("work", 0, 2))
+    result = c.get(base + f"/executions/{execution_id}").json()
+    assert result["status"] == "completed"
+    assert (
+        len([s for s in result["steps"] if s["step_name"] == "inventory_reservation"])
+        == 1
+    )
+    with httpx.Client(trust_env=False) as provider:
+        available = provider.post(
+            inv + "/inventory/check",
+            json={"tenant_id": tenant_id, "items": [{"sku": "A", "quantity": 1}]},
+        ).json()
+        assert available["items"][0]["available"] == 3

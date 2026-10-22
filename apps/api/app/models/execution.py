@@ -86,6 +86,10 @@ class WorkflowExecution(Base):
     )
 
     run_token: Mapped[uuid.UUID | None] = mapped_column(Uuid)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    active_event_id: Mapped[uuid.UUID | None] = mapped_column(Uuid)
     heartbeat_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )

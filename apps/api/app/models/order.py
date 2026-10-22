@@ -39,7 +39,7 @@ class Order(Base):
             name="uq_orders_id_tenant",
         ),
         CheckConstraint(
-            "status IN ('received', 'processing', "
+            "status IN ('received', 'queued', 'processing', "
             "'completed', 'failed', 'needs_attention')",
             name="ck_orders_status",
         ),

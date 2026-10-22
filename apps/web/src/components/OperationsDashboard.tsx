@@ -83,7 +83,7 @@ export default function OperationsDashboard({ tenant }: { tenant: string }) {
   useEffect(() => {
     const c = new AbortController()
     async function load() {
-      setExecution(null); setAudit([]); setDetailsError('')
+      setDetailsError('')
       if (!selected) return
       try {
         const [result, events] = await Promise.all([getExecution(tenant, selected, c.signal), getAudit(tenant, selected, c.signal)])
@@ -92,6 +92,10 @@ export default function OperationsDashboard({ tenant }: { tenant: string }) {
     }
     void load(); return () => c.abort()
   }, [tenant, selected, refresh])
+  useEffect(() => {
+    const timer = window.setInterval(() => setRefresh(v => v + 1), 2000)
+    return () => window.clearInterval(timer)
+  }, [])
   function apply(e: FormEvent) { e.preventDefault(); setOffset(0); setActive({ ...filters }) }
   return <section><div className="section-header"><h3>Operations console</h3><button disabled={loading} onClick={() => setRefresh(v => v + 1)}>Refresh operations</button></div>
     <p>All views belong to the selected retailer. Summaries use the selected date range; other filters apply to the execution list.</p>
@@ -104,10 +108,10 @@ export default function OperationsDashboard({ tenant }: { tenant: string }) {
     </div><button type="submit">Apply operations filters</button></form>
     {loading && <p>Loading operations...</p>}{error && <p role="alert">{error}</p>}
     {summary && <div className="metrics-grid">
-      <div><strong>{Object.values(summary.orders).reduce((a, b) => a + b, 0)}</strong><span>Orders received</span></div><div><strong>{summary.orders.completed ?? 0}</strong><span>Orders completed</span></div><div><strong>{summary.executions.failed ?? 0}</strong><span>Failed workflows</span></div><div><strong>{summary.executions.needs_attention ?? 0}</strong><span>Workflows needing attention</span></div><div><strong>{summary.pending_approvals}</strong><span>Pending approvals</span></div><div><strong>{summary.import_failures}</strong><span>Import failures</span></div><div><strong>{summary.retry_requests}</strong><span>Retry requests</span></div><div><strong>{summary.average_completed_duration_seconds === null ? 'No completed runs' : `${summary.average_completed_duration_seconds.toFixed(2)}s`}</strong><span>Average completed elapsed time, including approval waits</span></div>
+      <div><strong>{Object.values(summary.orders).reduce((a, b) => a + b, 0)}</strong><span>Orders received</span></div><div><strong>{summary.orders.queued ?? 0}</strong><span>Orders queued</span></div><div><strong>{summary.orders.completed ?? 0}</strong><span>Orders completed</span></div><div><strong>{summary.executions.failed ?? 0}</strong><span>Failed workflows</span></div><div><strong>{summary.executions.needs_attention ?? 0}</strong><span>Workflows needing attention</span></div><div><strong>{summary.pending_approvals}</strong><span>Pending approvals</span></div><div><strong>{summary.import_failures}</strong><span>Import failures</span></div><div><strong>{summary.retry_requests}</strong><span>Retry requests</span></div><div><strong>{summary.average_completed_duration_seconds === null ? 'No completed runs' : `${summary.average_completed_duration_seconds.toFixed(2)}s`}</strong><span>Average completed elapsed time, including approval waits</span></div>
     </div>}
     {!loading && !error && !values.length && <p>No executions match these filters.</p>}
-    <div className="table-container"><table className="tenant-table"><thead><tr><th>Order</th><th>Workflow</th><th>Source</th><th>Status</th><th>Last error</th><th>Started</th><th>Details</th></tr></thead><tbody>{values.map(v => <tr key={v.id}><td>{v.external_order_id}</td><td>{v.workflow_name} v{v.workflow_version}</td><td>{v.source.source ?? 'Order API'}</td><td><Status value={v.status} /></td><td>{v.error_category && <strong>{v.error_category}: </strong>}{v.error_message ?? 'None'}</td><td>{v.started_at ? new Date(v.started_at).toLocaleString() : 'Pending'}</td><td><button onClick={() => setSelected(v.id)}>Inspect {v.external_order_id}</button></td></tr>)}</tbody></table></div>
+    <div className="table-container"><table className="tenant-table"><thead><tr><th>Order</th><th>Workflow</th><th>Source</th><th>Status</th><th>Last error</th><th>Started</th><th>Details</th></tr></thead><tbody>{values.map(v => <tr key={v.id}><td>{v.external_order_id}</td><td>{v.workflow_name} v{v.workflow_version}</td><td>{v.source.source ?? 'Order API'}</td><td><Status value={v.status === 'pending' ? 'queued' : v.status} /></td><td>{v.error_category && <strong>{v.error_category}: </strong>}{v.error_message ?? 'None'}</td><td>{v.started_at ? new Date(v.started_at).toLocaleString() : 'Pending'}</td><td><button onClick={() => { setExecution(null); setAudit([]); setSelected(v.id) }}>Inspect {v.external_order_id}</button></td></tr>)}</tbody></table></div>
     <div className="pagination"><button disabled={offset === 0 || loading} onClick={() => setOffset(v => Math.max(0, v - 10))}>Previous executions</button><span>Page {offset / 10 + 1}</span><button disabled={values.length < 10 || loading} onClick={() => setOffset(v => v + 10)}>Next executions</button></div>
     {detailsError && <p role="alert">{detailsError}</p>}
     {execution && <><h4>Order {execution.order_id}</h4><pre>{JSON.stringify({ source: execution.definition_snapshot.source, items: execution.definition_snapshot.order_items }, null, 2)}</pre><ExecutionDetails execution={execution} /><RecoveryPanel tenant={tenant} execution={execution} onChanged={() => setRefresh(v => v + 1)} /><h4>Audit history (first 50 events)</h4>{audit.length === 0 && <p>No manual actions recorded.</p>}<ul>{audit.map(a => <li key={a.id}><strong>{a.action.replaceAll('_', ' ')}</strong> · {new Date(a.created_at).toLocaleString()}<p>{a.development_operator} (unverified): {a.note}</p><details><summary>State change</summary><pre>{JSON.stringify({ before: a.previous_state, after: a.new_state }, null, 2)}</pre></details></li>)}</ul></>}

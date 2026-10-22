@@ -49,6 +49,14 @@ payload = {
 status, order = call(8000, base, payload)
 assert status == 201
 _, execution = call(8000, base + f"/{order['id']}/process", method="POST")
+deadline = time.monotonic() + 90
+while execution["status"] in ("pending", "running"):
+    if time.monotonic() > deadline:
+        raise RuntimeError("Queued workflow did not finish")
+    time.sleep(0.25)
+    _, execution = call(
+        8000, f"/api/v1/tenants/{tenant['id']}/executions/{execution['id']}"
+    )
 assert execution["status"] == "completed"
 assert execution["steps"][-1]["output_summary"]["status"] == "accepted"
 assert call(8000, base, payload)[0] == 200

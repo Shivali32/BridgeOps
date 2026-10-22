@@ -1,5 +1,9 @@
 # BridgOps development and safe Windows update
 
+Kafka background processing is available on `work/bridgops-kafka`. Follow
+[kafka.md](kafka.md) for that branch's update commands and publisher/worker setup.
+The Docker app profile now includes Kafka and both background processes.
+
 This version is a trusted-local demonstration. Use Docker Desktop with WSL 2,
 Python 3.12, Node.js 22 and Git. The existing project can remain at `D:\BridgOps`.
 
@@ -63,7 +67,7 @@ py -3.12 -m venv .venv
 .\.venv\Scripts\python.exe -m alembic current
 ```
 
-The expected migration head is `7af6_operations`. Eight migrations preserve the
+The expected migration head is `7af7_kafka_outbox`. Nine migrations preserve the
 existing tenant/order migration history. No table recreation or volume deletion is needed.
 
 ## 4. Start the API and supporting services
@@ -81,6 +85,8 @@ The profile includes PostgreSQL, the migration job, API, inventory and fulfillme
 Published ports bind to 127.0.0.1. The migration container exits successfully after
 applying migrations. Provider tables share the physical database for this local demo.
 
+For Kafka host development, follow [kafka.md](kafka.md), including its publisher
+and worker commands. The three API commands below alone do not process queued work.
 Alternatively, leave only PostgreSQL in Docker and start these commands in three
 separate PowerShell terminals from `D:\BridgOps\apps\api`:
 

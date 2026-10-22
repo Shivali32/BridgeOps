@@ -5,6 +5,7 @@ import csv
 import io
 import json
 import os
+import time
 from decimal import Decimal
 from pathlib import Path
 from urllib.error import HTTPError, URLError
@@ -403,6 +404,14 @@ class GroceryDemo:
                 execution = self.call(
                     base + f"/orders/{saved['id']}/process", method="POST"
                 )
+                deadline = time.monotonic() + 90
+                while execution["status"] in ("pending", "running"):
+                    if time.monotonic() > deadline:
+                        raise RuntimeError(
+                            "Workflow did not finish. Check the Kafka publisher and worker."
+                        )
+                    time.sleep(0.25)
+                    execution = self.call(base + f"/executions/{execution['id']}")
                 status = execution["status"]
                 if status not in ("completed", "needs_attention", "failed"):
                     raise RuntimeError(

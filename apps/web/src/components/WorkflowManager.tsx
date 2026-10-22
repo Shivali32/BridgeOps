@@ -58,6 +58,18 @@ export function ApprovalPanel({ tenant }: { tenant: string }) {
     getApprovals(tenant, status, c.signal).then(v => { if (!c.signal.aborted) setValues(v) }).catch(e => { if (!c.signal.aborted) setError(errorMessage(e)) })
     return () => c.abort()
   }, [tenant, status, refresh])
+  useEffect(() => {
+    const timer = window.setInterval(() => setRefresh(v => v + 1), 2000)
+    return () => window.clearInterval(timer)
+  }, [])
+  useEffect(() => {
+    if (!execution || !['pending', 'running'].includes(execution.status)) return
+    const c = new AbortController()
+    const timer = window.setTimeout(() => {
+      getExecution(tenant, execution.id, c.signal).then(v => { if (!c.signal.aborted) setExecution(v) }).catch(e => { if (!c.signal.aborted) setError(errorMessage(e)) })
+    }, 1000)
+    return () => { window.clearTimeout(timer); c.abort() }
+  }, [tenant, execution])
   async function decide(value: Approval, action: string) {
     setBusy(true); setError('')
     try { setExecution(await decideApproval(tenant, value.id, action, note, operator)); setRefresh(v => v + 1); setNote('') }

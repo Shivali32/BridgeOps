@@ -91,6 +91,7 @@ jobs:
         env:
           ENABLE_DEMO_ADMIN: "true"
           INGEST_TOKEN: ci_local_ingestion_token
+          WORKFLOW_MODE: inline
         run: |
           python -m uvicorn app.main:app --port 8000 > /tmp/bridgops-api.log 2>&1 &
           python -m uvicorn app.providers.inventory:app --port 8001 > /tmp/bridgops-inventory.log 2>&1 &
@@ -144,6 +145,8 @@ jobs:
   compose:
     name: Compose Images and Workflow
     runs-on: ubuntu-latest
+    env:
+      INGEST_TOKEN: ci_local_ingestion_token
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -153,6 +156,8 @@ jobs:
         run: docker compose --profile app up -d --build
       - name: Verify HTTP order workflow
         run: python apps/api/scripts/smoke_compose.py
+      - name: Verify Kafka interruptions and duplicate delivery
+        run: python apps/api/scripts/smoke_kafka.py
       - name: Verify repeatable three-retailer demo
         run: |
           docker compose --profile app exec -T api python scripts/demo.py
@@ -161,6 +166,20 @@ jobs:
         run: |
           docker compose --profile app exec -T api python scripts/grocery_demo.py
           docker compose --profile app exec -T api python scripts/grocery_demo.py
+      - name: Set up Node for asynchronous browser journeys
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - name: Run browser journeys through Kafka
+        working-directory: apps/web
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+          npx playwright test
+        env:
+          CI: "true"
       - name: Show logs on failure
         if: failure()
         run: docker compose --profile app logs --no-color
