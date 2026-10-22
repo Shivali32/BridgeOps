@@ -6,6 +6,7 @@ The same path handles approved orders and eligible recovery actions.
 
 ## Update and run on Windows
 
+Stop any host Uvicorn processes using ports 8000-8002 before starting Compose.
 Save any local code changes before switching branches. Keep your existing `.env`
 credentials and database volume. With Docker Desktop running, use PowerShell:
 

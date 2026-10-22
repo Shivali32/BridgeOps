@@ -102,10 +102,12 @@ migrations, runs real HTTP and browser scenarios, and checks the actual Compose 
 ## Stack and scope
 
 Python, FastAPI, Pydantic, SQLAlchemy, PostgreSQL 17, Alembic, React, TypeScript,
-Vite, pytest, Ruff, Vitest, Testing Library, Playwright, Docker Compose and GitHub Actions.
+Vite, Apache Kafka, confluent-kafka, pytest, Ruff, Vitest, Testing Library, Playwright,
+Docker Compose and GitHub Actions.
 
-Stages 1 to 5 cover the local integration product. Stage 6, Kafka, is deferred.
-Future infrastructure is not required for this version. See [Stage 6 handoff](docs/stage6-handoff.md).
+Stages 1 to 5 cover the local integration product. Stage 6 adds Kafka background
+processing. Monitoring, scheduled data jobs and cloud deployment remain later work.
+See [Kafka setup](docs/kafka.md) and [verification status](docs/progress.md).
 
 Limitations: no authentication/authorization, no live Shopify account integration,
 no payment/delivery processing, no stock release or fulfillment cancellation, and
