@@ -118,6 +118,11 @@ Swagger is available on ports 8000, 8001 and 8002 at /docs.
 
 ## 6. Seed the three-retailer demo
 
+For a presentation with realistic grocery products and five named stores, use
+[grocery-demo.md](grocery-demo.md). Its seed command is
+`docker compose --profile app exec -T api python scripts/grocery_demo.py`.
+The original smaller example below is still supported.
+
 With the Compose stack running:
 
 ```powershell

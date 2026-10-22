@@ -69,10 +69,10 @@ jobs:
         run: python -m pytest -v
         
       - name: Check Python linting
-        run: python -m ruff check app tests
+        run: python -m ruff check app tests scripts
 
       - name: Check Python formatting
-        run: python -m ruff format --check app tests
+        run: python -m ruff format --check app tests scripts
 
       - name: Set up Node for browser verification
         uses: actions/setup-node@v4
@@ -157,6 +157,10 @@ jobs:
         run: |
           docker compose --profile app exec -T api python scripts/demo.py
           docker compose --profile app exec -T api python scripts/demo.py
+      - name: Verify repeatable five-store grocery presentation
+        run: |
+          docker compose --profile app exec -T api python scripts/grocery_demo.py
+          docker compose --profile app exec -T api python scripts/grocery_demo.py
       - name: Show logs on failure
         if: failure()
         run: docker compose --profile app logs --no-color

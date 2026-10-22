@@ -1,8 +1,12 @@
 import os
 import socket
+import subprocess
+import sys
 import threading
 import time
+from collections import Counter
 from contextlib import contextmanager
+from pathlib import Path
 from uuid import uuid4
 
 import httpx
@@ -297,3 +301,148 @@ def test_actual_http_fulfillment_retry_preserves_reservation(live):
         assert check["items"][0]["available"] == 3
     assert c.get(base + "/operations/summary").json()["retry_requests"] == 1
     assert len(c.get(base + f"/executions/{failed['id']}/audit").json()) >= 1
+
+
+def run_grocery_seed(client, inventory, fulfillment, *args):
+    environment = {
+        **os.environ,
+        "DEMO_API_URL": str(client.base_url),
+        "INVENTORY_URL": inventory,
+        "FULFILLMENT_URL": fulfillment,
+    }
+    result = subprocess.run(
+        [sys.executable, "scripts/grocery_demo.py", *args],
+        check=False,
+        cwd=Path(__file__).resolve().parents[1],
+        env=environment,
+        capture_output=True,
+        text=True,
+        timeout=90,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    return result.stdout
+
+
+def test_actual_http_five_grocery_stores_repeat_and_present(live, monkeypatch):
+    """Run the delivered CLI, present its live actions, then seed again safely."""
+    c, inv, ful = live
+    monkeypatch.setenv("INGEST_TOKEN", "grocery-local-token")
+    output = run_grocery_seed(c, inv, ful)
+    assert "5 grocery stores, 15 valid orders and 1 invalid import" in output
+    tenants = c.get("/api/v1/tenants").json()
+    assert len(tenants) == 5
+    stores = {t["slug"]: f"/api/v1/tenants/{t['id']}" for t in tenants}
+
+    def snapshot():
+        result = {}
+        for tenant in tenants:
+            base = stores[tenant["slug"]]
+            orders = c.get(base + "/orders").json()
+            assert len(orders) == 3
+            assert len(c.get(base + "/integrations").json()) == 1
+            assert len(c.get(base + "/workflow-definitions").json()) == 1
+            for order in orders:
+                executions = c.get(base + f"/orders/{order['id']}/executions").json()
+                assert len(executions) <= 1
+                result[order["external_order_id"]] = (
+                    order["id"],
+                    order["status"],
+                    [e["id"] for e in executions],
+                )
+            result[tenant["slug"] + "-imports"] = [
+                r["id"] for r in c.get(base + "/imports").json()
+            ]
+            skus = sorted({item["sku"] for order in orders for item in order["items"]})
+            with httpx.Client(trust_env=False) as provider:
+                result[tenant["slug"] + "-stock"] = provider.post(
+                    inv + "/inventory/check",
+                    json={
+                        "tenant_id": tenant["id"],
+                        "items": [{"sku": s, "quantity": 1} for s in skus],
+                    },
+                ).json()
+        return result
+
+    before = snapshot()
+    statuses = Counter(
+        before[ref][1]
+        for ref in before
+        if ref[:3] in ("MW-", "CG-", "OL-", "HF-", "SN-")
+    )
+    assert statuses == {
+        "completed": 12,
+        "needs_attention": 1,
+        "failed": 1,
+        "received": 1,
+    }
+    run_grocery_seed(c, inv, ful)
+    assert snapshot() == before  # No duplicate orders/imports/runs or stock resets.
+
+    # Invalid CSV stays visible, with a real grocery SKU and its source row.
+    orchard = stores["orchard-lane-produce"]
+    records = c.get(orchard + "/imports").json()
+    invalid = next(r for r in records if r["source_reference"] == "OL-3004")
+    assert invalid["status"] == "failed" and invalid["order_id"] is None
+    assert invalid["row_numbers"] == [8]
+
+    cedar = stores["cedar-grove-grocers"]
+    approval = c.get(cedar + "/approvals?status=pending").json()[0]
+    pending = c.get(cedar + f"/executions/{approval['execution_id']}").json()
+    assert [s["step_name"] for s in pending["steps"]] == [
+        "large_basket",
+        "manager_approval",
+    ]
+    assert (
+        c.post(
+            cedar + f"/approvals/{approval['id']}/decision",
+            json={"decision": "approve", "note": "Bulk grocery basket reviewed"},
+        ).json()["status"]
+        == "completed"
+    )
+
+    harbor = stores["harbor-fresh-foods"]
+    run_grocery_seed(c, inv, ful, "--restock-harbor")
+    recovered = c.post(
+        harbor + f"/executions/{before['HF-4003'][2][0]}/recovery",
+        json={
+            "request_key": "salmon-restocked",
+            "action": "retry",
+            "note": "Received fresh salmon stock",
+        },
+    ).json()
+    assert recovered["status"] == "completed"
+    assert (
+        sum(s["step_name"] == "inventory_reservation" for s in recovered["steps"]) == 1
+    )
+
+    sunrise = stores["sunrise-neighborhood-pantry"]
+    assert (
+        c.post(sunrise + f"/orders/{before['SN-5003'][0]}/process").json()["status"]
+        == "completed"
+    )
+    after_presenting = snapshot()
+    run_grocery_seed(c, inv, ful)
+    assert snapshot() == after_presenting  # Presenter decisions are not undone.
+
+
+def test_grocery_seed_preserves_edited_integration(live, monkeypatch):
+    from scripts.grocery_demo import STORES, GroceryDemo
+
+    c, inv, ful = live
+    monkeypatch.setenv("INGEST_TOKEN", "grocery-local-token")
+    demo = GroceryDemo(str(c.base_url), inv, ful, "grocery-local-token")
+    tenant = demo.seed_store(STORES[0])
+    base = f"/api/v1/tenants/{tenant['id']}"
+    integration = c.get(base + "/integrations").json()[0]
+    data = {
+        key: integration[key]
+        for key in ("name", "connector_type", "workflow_id", "mapping")
+    }
+    data.update(enabled=False, expected_version=integration["version"])
+    assert (
+        c.patch(base + f"/integrations/{integration['id']}", json=data).status_code
+        == 200
+    )
+    with pytest.raises(RuntimeError, match="was edited"):
+        demo.seed_store(STORES[0])
+    assert c.get(base + "/integrations").json()[0]["enabled"] is False
