@@ -8,7 +8,7 @@ Draft Kafka review: https://github.com/Shivali32/BridgeOps/pull/2
 Setup and demonstration: [kafka.md](kafka.md).
 
 Stage 6 local checks: 118 backend tests passed, with 13 PostgreSQL-only tests
-explicitly skipped; 36 frontend tests passed, plus Ruff, ESLint and the frontend
+explicitly skipped; 37 frontend tests passed, plus Ruff, ESLint and the frontend
 build. The backend checks include interrupted real HTTP fulfillment acceptance
 followed by reconciliation without another business write.
 
@@ -18,9 +18,11 @@ That run verified image startup, worker restart, broker outage, duplicate delive
 malformed-message quarantine, both repeatable retailer demos and all four browser
 journeys through Kafka. The frontend job also passed.
 
-The current CI pipeline runs the complete PostgreSQL backend suite, migration
-model-drift checks and Python checks inside the actual API image, followed by those
-Kafka and browser scenarios. Current branch verification:
+The complete backend suite passed with 131 tests against PostgreSQL inside the
+actual API image, together with migration model-drift and Python checks. The CI
+pipeline runs that suite followed by the Kafka and browser scenarios. The frontend
+regression suite also verifies that refreshing Operations preserves approval notes
+and a queued approval result. Current branch verification:
 https://github.com/Shivali32/BridgeOps/actions?query=branch%3Awork%2Fbridgops-kafka
 
 The baseline and historical verification evidence below describe Stage 5.

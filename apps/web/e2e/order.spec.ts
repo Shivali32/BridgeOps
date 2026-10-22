@@ -65,6 +65,8 @@ test('operator configures approval and resumes a paused order', async ({ page, r
   expect((await available.json() as { available: boolean }).available).toBeTruthy()
   await page.getByRole('button', { name: 'Operations', exact: true }).click()
   await page.getByLabel('Decision note').fill('Reviewed in browser')
+  await page.getByRole('button', { name: 'Refresh operations', exact: true }).click()
+  await expect(page.getByLabel('Decision note')).toHaveValue('Reviewed in browser')
   await page.getByRole('button', { name: /^Approve / }).click()
   await expect(page.getByText('Fulfillment request accepted. Delivery is outside this workflow.')).toBeVisible()
 })

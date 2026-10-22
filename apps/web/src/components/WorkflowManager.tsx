@@ -44,7 +44,7 @@ function WorkflowEditor({ tenant, value, onSaved }: { tenant: string; value: Def
   </fieldset>{error && <p role="alert">{error}</p>}</form>
 }
 
-export function ApprovalPanel({ tenant }: { tenant: string }) {
+export function ApprovalPanel({ tenant, refreshToken = 0 }: { tenant: string; refreshToken?: number }) {
   const [values, setValues] = useState<Approval[]>([])
   const [status, setStatus] = useState('pending')
   const [note, setNote] = useState('')
@@ -57,7 +57,7 @@ export function ApprovalPanel({ tenant }: { tenant: string }) {
     const c = new AbortController()
     getApprovals(tenant, status, c.signal).then(v => { if (!c.signal.aborted) setValues(v) }).catch(e => { if (!c.signal.aborted) setError(errorMessage(e)) })
     return () => c.abort()
-  }, [tenant, status, refresh])
+  }, [tenant, status, refresh, refreshToken])
   useEffect(() => {
     const timer = window.setInterval(() => setRefresh(v => v + 1), 2000)
     return () => window.clearInterval(timer)

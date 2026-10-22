@@ -116,6 +116,6 @@ export default function OperationsDashboard({ tenant }: { tenant: string }) {
     {detailsError && <p role="alert">{detailsError}</p>}
     {execution && <><h4>Order {execution.order_id}</h4><pre>{JSON.stringify({ source: execution.definition_snapshot.source, items: execution.definition_snapshot.order_items }, null, 2)}</pre><ExecutionDetails execution={execution} /><RecoveryPanel tenant={tenant} execution={execution} onChanged={() => setRefresh(v => v + 1)} /><h4>Audit history (first 50 events)</h4>{audit.length === 0 && <p>No manual actions recorded.</p>}<ul>{audit.map(a => <li key={a.id}><strong>{a.action.replaceAll('_', ' ')}</strong> · {new Date(a.created_at).toLocaleString()}<p>{a.development_operator} (unverified): {a.note}</p><details><summary>State change</summary><pre>{JSON.stringify({ before: a.previous_state, after: a.new_state }, null, 2)}</pre></details></li>)}</ul></>}
     <h4>Latest saved orders, all dates</h4><ul>{orders.map(o => <li key={o.id}>{o.external_order_id} · <Status value={o.status} /> · {new Date(o.created_at).toLocaleString()}</li>)}</ul>
-    <ApprovalPanel key={`approvals-${refresh}`} tenant={tenant} />
+    <ApprovalPanel key={tenant} tenant={tenant} refreshToken={refresh} />
   </section>
 }
