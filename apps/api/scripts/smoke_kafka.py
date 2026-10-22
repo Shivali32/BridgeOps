@@ -118,11 +118,15 @@ from app.models.messaging import OutboxEvent
 with SessionLocal() as db:
     event = db.scalar(select(OutboxEvent).where(OutboxEvent.execution_id == UUID({orders[0]["id"]!r})))
     producer = make_producer()
-    producer.produce(topic(), partition=0, value=json.dumps(event.payload).encode())
-    producer.produce(topic(), partition=0, value={marker!r}.encode())
+    delivered = []
+    def confirmed(error, message):
+        delivered.append(error)
+    producer.produce(topic(), partition=0, value=json.dumps(event.payload).encode(), on_delivery=confirmed)
+    producer.produce(topic(), partition=0, value={marker!r}.encode(), on_delivery=confirmed)
     assert producer.flush(10) == 0
+    assert len(delivered) == 2 and all(error is None for error in delivered), delivered
 """
-        compose("exec", "-T", "api", "python", "-c", code)
+        compose("exec", "-T", "publisher", "python", "-c", code)
         check = f"""
 import hashlib
 from sqlalchemy import select, func

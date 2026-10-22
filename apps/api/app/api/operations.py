@@ -5,7 +5,7 @@ from uuid import UUID
 from fastapi import APIRouter, HTTPException, Query, Response
 from sqlalchemy import func, select
 
-from app.api.workflows import DbSession, ProviderDependency
+from app.api.workflows import DbSession, ProviderDependency, execution_response
 from app.messaging.contracts import queued_mode
 from app.models.messaging import EventReceipt, OutboxEvent
 from app.models.operations import AuditEvent
@@ -112,8 +112,7 @@ def recovery(
     response: Response,
 ):
     result = recover(db, tenant_id, execution_id, data, providers, queued=queued_mode())
-    response.status_code = 202 if result.status == "pending" else 200
-    return result
+    return execution_response(response, tenant_id, result)
 
 
 @router.get("/executions/{execution_id}/audit")

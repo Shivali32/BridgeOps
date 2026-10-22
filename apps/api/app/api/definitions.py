@@ -4,7 +4,7 @@ from uuid import UUID
 from fastapi import APIRouter, Query, Response
 from sqlalchemy import select
 
-from app.api.workflows import DbSession, ProviderDependency
+from app.api.workflows import DbSession, ProviderDependency, execution_response
 from app.messaging.contracts import queued_mode
 from app.models.definition import Approval, WorkflowDefinition, WorkflowVersion
 from app.schemas.definition import (
@@ -114,5 +114,4 @@ def decision(
     result = decide_approval(
         db, tenant_id, approval_id, data, providers, queued=queued_mode()
     )
-    response.status_code = 202 if result.status == "pending" else 200
-    return result
+    return execution_response(response, tenant_id, result)

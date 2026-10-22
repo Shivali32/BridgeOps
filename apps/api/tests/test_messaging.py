@@ -1,7 +1,7 @@
 import json
 from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta
-from threading import Barrier
+from threading import Barrier, Event
 from uuid import uuid4
 
 import pytest
@@ -86,6 +86,7 @@ def test_api_queues_without_needing_kafka(api_client, engine, monkeypatch):
         path = f"/api/v1/tenants/{tenant.id}/orders/{order.id}/process"
     first = api_client.post(path)
     assert first.status_code == 202 and first.json()["status"] == "pending"
+    assert first.headers["location"].endswith("/executions/" + first.json()["id"])
     assert api_client.post(path).json()["id"] == first.json()["id"]
     with Session(engine) as db:
         assert db.scalar(select(func.count()).select_from(OutboxEvent)) == 1
@@ -272,3 +273,67 @@ def test_postgres_simultaneous_queue_requests(pg_engine):
     assert ids[0] == ids[1]
     with Session(pg_engine) as db:
         assert db.scalar(select(func.count()).select_from(OutboxEvent)) == 1
+
+
+def test_postgres_worker_ownership_blocks_a_competing_delivery(pg_engine):
+    with Session(pg_engine, expire_on_commit=False) as db:
+        _, _, execution = queued(db)
+        raw = message(db, execution)
+    entered, release = Event(), Event()
+    calls = []
+
+    def first():
+        with Session(pg_engine, expire_on_commit=False) as db:
+
+            class PausedProvider(FakeProviders):
+                def call(self, name, payload):
+                    calls.append(name)
+                    if name == "inventory_check":
+                        entered.set()
+                        assert release.wait(10)
+                    return super().call(name, payload)
+
+            return deliver(db, raw, PausedProvider(db))
+
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        running = pool.submit(first)
+        try:
+            assert entered.wait(10)
+            with Session(pg_engine, expire_on_commit=False) as db:
+                assert not deliver(db, raw)
+                assert db.scalar(select(EventReceipt)) is None
+        finally:
+            release.set()
+        assert running.result(timeout=10)
+    with Session(pg_engine, expire_on_commit=False) as db:
+        assert deliver(db, raw)
+        assert db.scalar(select(func.count()).select_from(EventReceipt)) == 1
+    assert calls == ["inventory_check", "inventory_reservation", "fulfillment_request"]
+
+
+def test_postgres_publishers_skip_a_claimed_outbox_row(pg_engine):
+    with Session(pg_engine, expire_on_commit=False) as db:
+        queued(db)
+    entered, release = Event(), Event()
+    producer = Producer()
+
+    def first():
+        class PausedProducer(Producer):
+            def flush(self, timeout):
+                entered.set()
+                assert release.wait(10)
+                return 0
+
+        with Session(pg_engine, expire_on_commit=False) as db:
+            return publish_one(db, PausedProducer())
+
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        running = pool.submit(first)
+        try:
+            assert entered.wait(10)
+            with Session(pg_engine, expire_on_commit=False) as db:
+                assert not publish_one(db, producer)
+        finally:
+            release.set()
+        assert running.result(timeout=10)
+    assert producer.sent == []
