@@ -38,8 +38,8 @@ function WorkflowEditor({ tenant, value, onSaved }: { tenant: string; value: Def
     <label><input type="checkbox" checked={enabled} onChange={e => setEnabled(e.target.checked)} /> Workflow enabled</label>{' '}
     <label><input type="checkbox" checked={isDefault} onChange={e => setDefault(e.target.checked)} /> Default for this retailer</label>
     <div className="form-actions"><button type="button" onClick={() => setSteps(JSON.stringify(standard, null, 2))}>Use standard steps</button><label>Approval threshold<input type="number" min="0" step="0.01" value={threshold} onChange={e => setThreshold(e.target.value)} /></label><button type="button" onClick={() => setSteps(JSON.stringify(approvalPreset(threshold), null, 2))}>Use approval steps</button></div>
-    <label className="form-field">Workflow steps JSON<textarea rows={15} required value={steps} onChange={e => setSteps(e.target.value)} /></label>
-    <p>Supported: condition, approval, inventory_check, inventory_reservation, fulfillment_request. Approval branches can reference earlier condition steps. The server validates every configuration.</p>
+    {/* <label className="form-field">Workflow steps JSON<textarea rows={15} required value={steps} onChange={e => setSteps(e.target.value)} /></label>
+    <p>Supported: condition, approval, inventory_check, inventory_reservation, fulfillment_request. Approval branches can reference earlier condition steps. The server validates every configuration.</p> */}
     <button type="submit">{busy ? 'Saving workflow...' : 'Save workflow'}</button>
   </fieldset>{error && <p role="alert">{error}</p>}</form>
 }
