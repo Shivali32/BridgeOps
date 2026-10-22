@@ -70,12 +70,17 @@ export function Orders({ tenant }: { tenant: string }) {
     const controller = new AbortController()
     async function load() {
       if (!selected) return
-      setDetailsError(''); setExecutions([])
+      setDetailsError('')
       try { const result = await getExecutions(tenant, selected.id, controller.signal); if (!controller.signal.aborted) setExecutions(result) }
       catch (e) { if (!controller.signal.aborted) setDetailsError(errorMessage(e)) }
     }
     void load(); return () => controller.abort()
   }, [tenant, selected, refresh])
+  useEffect(() => {
+    if (!orders.some(o => ['queued', 'processing'].includes(o.status)) && !executions.some(e => ['pending', 'running'].includes(e.status))) return
+    const timer = window.setInterval(() => setRefresh(v => v + 1), 1500)
+    return () => window.clearInterval(timer)
+  }, [orders, executions])
   async function process(order: Order) {
     setBusy(true); setDetailsError('')
     try { await processOrder(tenant, order.id); setSelected(order); setRefresh(v => v + 1) }
@@ -87,7 +92,7 @@ export function Orders({ tenant }: { tenant: string }) {
     {error && <p role="alert">{error}</p>}{loading && <p>Loading orders...</p>}
     {!loading && !orders.length && <p>No orders for this retailer.</p>}
     <div className="table-container"><table className="tenant-table"><thead><tr><th>External ID</th><th>Status</th><th>Items</th><th>Received</th><th>Actions</th></tr></thead><tbody>
-      {orders.map(order => <tr key={order.id}><td>{order.external_order_id}</td><td><Status value={order.status} /></td><td>{order.items.length}</td><td>{new Date(order.created_at).toLocaleString()}</td><td className="table-actions"><button onClick={() => setSelected(order)}>View {order.external_order_id}</button><button disabled={busy || order.status !== 'received'} onClick={() => void process(order)}>Process {order.external_order_id}</button></td></tr>)}
+      {orders.map(order => <tr key={order.id}><td>{order.external_order_id}</td><td><Status value={order.status} /></td><td>{order.items.length}</td><td>{new Date(order.created_at).toLocaleString()}</td><td className="table-actions"><button onClick={() => { setExecutions([]); setSelected(order) }}>View {order.external_order_id}</button><button disabled={busy || order.status !== 'received'} onClick={() => void process(order)}>Process {order.external_order_id}</button></td></tr>)}
     </tbody></table></div>
     <div className="pagination"><button disabled={offset === 0 || loading || busy} onClick={() => setOffset(v => Math.max(0, v - 10))}>Previous orders</button><span>Page {offset / 10 + 1}</span><button disabled={orders.length < 10 || loading || busy} onClick={() => setOffset(v => v + 10)}>Next orders</button></div>
     {detailsError && <p role="alert">{detailsError}</p>}

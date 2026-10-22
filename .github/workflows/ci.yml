@@ -12,104 +12,6 @@ permissions:
   contents: read
 
 jobs:
-  backend:
-    name: Backend Tests
-    runs-on: ubuntu-latest
-
-    services:
-      postgres:
-        image: postgres:17
-        env:
-          POSTGRES_USER: bridgops_test
-          POSTGRES_PASSWORD: ci_placeholder_password
-          POSTGRES_DB: bridgops_test_db
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U bridgops_test -d bridgops_test_db"
-          --health-interval 5s --health-timeout 5s --health-retries 10
-
-    defaults:
-      run:
-        working-directory: apps/api
-
-    env:
-      POSTGRES_USER: bridgops_test
-      POSTGRES_PASSWORD: ci_placeholder_password
-      POSTGRES_DB: bridgops_test_db
-      POSTGRES_PORT: 5432
-      TEST_DATABASE_URL: postgresql+psycopg://bridgops_test:ci_placeholder_password@localhost:5432/bridgops_test_db
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-          cache: pip
-          cache-dependency-path: apps/api/requirements.txt
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install -r requirements.txt
-
-      - name: Validate Compose configuration
-        working-directory: .
-        run: docker compose --env-file .env.example --profile app config --quiet
-
-      - name: Verify migrations
-        run: |
-          python -m alembic upgrade head
-          python -m alembic check
-
-      - name: Run backend tests
-        run: python -m pytest -v
-        
-      - name: Check Python linting
-        run: python -m ruff check app tests scripts
-
-      - name: Check Python formatting
-        run: python -m ruff format --check app tests scripts
-
-      - name: Set up Node for browser verification
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: npm
-          cache-dependency-path: apps/web/package-lock.json
-
-      - name: Install browser test dependencies
-        working-directory: apps/web
-        run: |
-          npm ci
-          npx playwright install --with-deps chromium
-
-      - name: Run browser workflow against PostgreSQL and HTTP services
-        env:
-          ENABLE_DEMO_ADMIN: "true"
-          INGEST_TOKEN: ci_local_ingestion_token
-        run: |
-          python -m uvicorn app.main:app --port 8000 > /tmp/bridgops-api.log 2>&1 &
-          python -m uvicorn app.providers.inventory:app --port 8001 > /tmp/bridgops-inventory.log 2>&1 &
-          python -m uvicorn app.providers.fulfillment:app --port 8002 > /tmp/bridgops-fulfillment.log 2>&1 &
-          curl --retry 10 --retry-connrefused --retry-delay 1 --fail http://127.0.0.1:8000/health
-          curl --retry 10 --retry-connrefused --retry-delay 1 --fail http://127.0.0.1:8001/health
-          curl --retry 10 --retry-connrefused --retry-delay 1 --fail http://127.0.0.1:8002/health
-          cd ../web
-          npx playwright test
-
-      - name: Save browser evidence
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: browser-workflow-evidence
-          path: apps/web/test-results
-          retention-days: 7
-
-
   frontend:
     name: Frontend Tests and Build
     runs-on: ubuntu-latest
@@ -142,17 +44,29 @@ jobs:
         run: npm run build
 
   compose:
-    name: Compose Images and Workflow
+    name: PostgreSQL, Kafka and Browser Verification
     runs-on: ubuntu-latest
+    env:
+      INGEST_TOKEN: ci_local_ingestion_token
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
       - name: Configure isolated demo environment
         run: cp .env.example .env
+      - name: Validate Compose configuration
+        run: docker compose --profile app config --quiet
       - name: Build and start the actual images
         run: docker compose --profile app up -d --build
+      - name: Verify PostgreSQL backend, migrations and Python checks in the actual image
+        run: |
+          docker compose --profile app exec -T api python -m alembic check
+          docker compose --profile app exec -T api python -c "import os,subprocess,sys; from app.db import DATABASE_URL; env=dict(os.environ, TEST_DATABASE_URL=DATABASE_URL.render_as_string(hide_password=False), WORKFLOW_MODE='inline'); sys.exit(subprocess.call([sys.executable,'-m','pytest','-q'], env=env))"
+          docker compose --profile app exec -T api python -m ruff check app tests scripts
+          docker compose --profile app exec -T api python -m ruff format --check app tests scripts
       - name: Verify HTTP order workflow
         run: python apps/api/scripts/smoke_compose.py
+      - name: Verify Kafka interruptions and duplicate delivery
+        run: python apps/api/scripts/smoke_kafka.py
       - name: Verify repeatable three-retailer demo
         run: |
           docker compose --profile app exec -T api python scripts/demo.py
@@ -161,6 +75,27 @@ jobs:
         run: |
           docker compose --profile app exec -T api python scripts/grocery_demo.py
           docker compose --profile app exec -T api python scripts/grocery_demo.py
+      - name: Set up Node for asynchronous browser journeys
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - name: Run browser journeys through Kafka
+        working-directory: apps/web
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+          npx playwright test
+        env:
+          CI: "true"
+      - name: Save browser evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kafka-browser-evidence
+          path: apps/web/test-results
+          retention-days: 7
       - name: Show logs on failure
         if: failure()
         run: docker compose --profile app logs --no-color

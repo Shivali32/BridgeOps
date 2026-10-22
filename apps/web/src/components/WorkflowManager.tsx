@@ -44,7 +44,7 @@ function WorkflowEditor({ tenant, value, onSaved }: { tenant: string; value: Def
   </fieldset>{error && <p role="alert">{error}</p>}</form>
 }
 
-export function ApprovalPanel({ tenant }: { tenant: string }) {
+export function ApprovalPanel({ tenant, refreshToken = 0 }: { tenant: string; refreshToken?: number }) {
   const [values, setValues] = useState<Approval[]>([])
   const [status, setStatus] = useState('pending')
   const [note, setNote] = useState('')
@@ -57,7 +57,19 @@ export function ApprovalPanel({ tenant }: { tenant: string }) {
     const c = new AbortController()
     getApprovals(tenant, status, c.signal).then(v => { if (!c.signal.aborted) setValues(v) }).catch(e => { if (!c.signal.aborted) setError(errorMessage(e)) })
     return () => c.abort()
-  }, [tenant, status, refresh])
+  }, [tenant, status, refresh, refreshToken])
+  useEffect(() => {
+    const timer = window.setInterval(() => setRefresh(v => v + 1), 2000)
+    return () => window.clearInterval(timer)
+  }, [])
+  useEffect(() => {
+    if (!execution || !['pending', 'running'].includes(execution.status)) return
+    const c = new AbortController()
+    const timer = window.setTimeout(() => {
+      getExecution(tenant, execution.id, c.signal).then(v => { if (!c.signal.aborted) setExecution(v) }).catch(e => { if (!c.signal.aborted) setError(errorMessage(e)) })
+    }, 1000)
+    return () => { window.clearTimeout(timer); c.abort() }
+  }, [tenant, execution])
   async function decide(value: Approval, action: string) {
     setBusy(true); setError('')
     try { setExecution(await decideApproval(tenant, value.id, action, note, operator)); setRefresh(v => v + 1); setNote('') }

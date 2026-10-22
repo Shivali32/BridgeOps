@@ -1,7 +1,10 @@
-# BridgOps engineering report
+# BridgOps Stage 5 engineering report
 
 Date: 21 October 2026. Scope: complete the existing project through Stage 5 and
 stop before Kafka. The original repository and migration history were preserved.
+
+For the later Kafka implementation, see [kafka.md](kafka.md) and [progress.md](progress.md).
+This report preserves the original Stage 5 delivery evidence.
 
 ## A. Repository and delivery
 

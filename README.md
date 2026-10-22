@@ -18,17 +18,21 @@ All Compose ports bind to loopback. A tenant selector is not an access-control s
 - Execution steps, provider references, failure categories and approval history.
 - Operations filters, database summaries, safe retries, reconciliation and audit notes.
 - A React workspace for orders, integrations, workflows, approvals and operations.
+- Kafka background processing with a transactional PostgreSQL outbox, publisher,
+  duplicate-safe worker, crash reconciliation and malformed-message quarantine.
 
 Completed workflow means **fulfillment request accepted**, not delivered.
 Saving/importing an order does not start processing automatically. Process is an
-explicit synchronous action. No Kafka or background messaging has been added.
+explicit action that queues a workflow and returns HTTP 202. The UI refreshes
+progress while the Kafka worker processes it. Approvals and eligible recovery
+actions also queue work without keeping the API request open.
 
 ## Run locally on Windows
 
 Requirements: Python 3.12, Node.js 22, Git and Docker Desktop with WSL 2.
 
 ```powershell
-Copy-Item .env.example .env
+if (-not (Test-Path .env)) { Copy-Item .env.example .env }
 notepad .env
 ```
 
@@ -43,7 +47,8 @@ npm.cmd run dev
 ```
 
 Open http://localhost:5173. The app profile starts PostgreSQL, migrations, the API,
-inventory and fulfillment. PostgreSQL alone remains `docker compose up -d postgres`.
+inventory, fulfillment, Kafka, its topic setup job, the publisher and the worker.
+PostgreSQL alone remains `docker compose up -d postgres`.
 
 Seed three example retailers, including a pending approval and a CSV validation failure:
 
@@ -56,6 +61,8 @@ The demo can be repeated. It reuses orders/configurations and only initializes m
 stock. It does not reset your database. Refresh retailer choices in React afterward.
 
 See [Windows setup and safe branch update](docs/development.md),
+[Kafka setup and interruption demo](docs/kafka.md),
+[five-store grocery walkthrough](docs/grocery-demo.md),
 [demonstration guide](docs/demo.md), [architecture](docs/architecture.md),
 [progress](docs/progress.md), and [engineering report](docs/engineering-report.md).
 
@@ -68,6 +75,7 @@ See [Windows setup and safe branch update](docs/development.md),
 | Inventory and Swagger | http://127.0.0.1:8001/docs |
 | Fulfillment and Swagger | http://127.0.0.1:8002/docs |
 | PostgreSQL host port | localhost:5433 |
+| Kafka host listener | localhost:9092 |
 
 ## Checks
 
@@ -94,10 +102,12 @@ migrations, runs real HTTP and browser scenarios, and checks the actual Compose 
 ## Stack and scope
 
 Python, FastAPI, Pydantic, SQLAlchemy, PostgreSQL 17, Alembic, React, TypeScript,
-Vite, pytest, Ruff, Vitest, Testing Library, Playwright, Docker Compose and GitHub Actions.
+Vite, Apache Kafka, confluent-kafka, pytest, Ruff, Vitest, Testing Library, Playwright,
+Docker Compose and GitHub Actions.
 
-Stages 1 to 5 cover the local integration product. Stage 6, Kafka, is deferred.
-Future infrastructure is not required for this version. See [Stage 6 handoff](docs/stage6-handoff.md).
+Stages 1 to 5 cover the local integration product. Stage 6 adds Kafka background
+processing. Monitoring, scheduled data jobs and cloud deployment remain later work.
+See [Kafka setup](docs/kafka.md) and [verification status](docs/progress.md).
 
 Limitations: no authentication/authorization, no live Shopify account integration,
 no payment/delivery processing, no stock release or fulfillment cancellation, and

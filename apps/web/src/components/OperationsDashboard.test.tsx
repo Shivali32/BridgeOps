@@ -5,7 +5,7 @@ import OperationsDashboard, { RecoveryPanel } from './OperationsDashboard'
 import { getAudit, getOperations, getSummary, recoverExecution } from '../api/operations'
 import { getIntegrations } from '../api/integrations'
 import { getOrders } from '../api/orders'
-import { getApprovals, getExecution } from '../api/workflows'
+import { decideApproval, getApprovals, getExecution } from '../api/workflows'
 import type { Execution } from '../types/order'
 
 vi.mock('../api/operations', () => ({ getAudit: vi.fn(), getOperations: vi.fn(), getSummary: vi.fn(), recoverExecution: vi.fn() }))
@@ -23,6 +23,23 @@ beforeEach(() => {
   vi.mocked(getApprovals).mockResolvedValue([])
   vi.mocked(getExecution).mockResolvedValue(execution)
   vi.mocked(recoverExecution).mockResolvedValue({ ...execution, status: 'completed' })
+})
+it('preserves an approval note and queued result when operations refresh', async () => {
+  vi.mocked(getApprovals).mockResolvedValue([{ id: 'a-1', tenant_id: 't', execution_id: 'ex-1', step_name: 'approve', reason: 'Bulk order', status: 'pending', decision_note: null, development_operator: null, created_at: '', decided_at: null }])
+  const queued = { ...execution, status: 'pending', error_message: null, error_category: null, steps: [] }
+  vi.mocked(decideApproval).mockResolvedValue(queued)
+  vi.mocked(getExecution).mockResolvedValue({ ...queued, status: 'completed' })
+  const user = userEvent.setup()
+  render(<OperationsDashboard tenant="t" />)
+  await screen.findByText('FAILED-1')
+  await user.type(screen.getByLabelText('Decision note'), 'Bulk order reviewed')
+  await user.click(screen.getByRole('button', { name: 'Refresh operations' }))
+  await waitFor(() => expect(getOperations).toHaveBeenCalledTimes(2))
+  expect(screen.getByLabelText('Decision note')).toHaveValue('Bulk order reviewed')
+  await user.click(await screen.findByRole('button', { name: 'Approve a-1' }))
+  expect(await screen.findByText(/Queued for background processing/)).toBeInTheDocument()
+  await user.click(screen.getByRole('button', { name: 'Refresh operations' }))
+  expect(await screen.findByText(/Fulfillment request accepted/, {}, { timeout: 4000 })).toBeInTheDocument()
 })
 it('loads actual summaries and applies execution filters', async () => {
   const user = userEvent.setup()

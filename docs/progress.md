@@ -1,10 +1,31 @@
 # BridgOps development progress
 
-Updated: 21 October 2026.
+Updated: 22 October 2026.
 
-Stages 1 to 5 are implemented. Kafka and Stage 6 are not implemented.
-Work is on `work/bridgops-stage2-to-stage5`; main remains unchanged.
-Draft review: https://github.com/Shivali32/BridgeOps/pull/1
+Stages 1 to 5 remain implemented. Stage 6 Kafka dispatch is implemented on
+`work/bridgops-kafka`. Main and the Stage 5 branch are unchanged.
+Draft Kafka review: https://github.com/Shivali32/BridgeOps/pull/2
+Setup and demonstration: [kafka.md](kafka.md).
+
+Stage 6 local checks: 118 backend tests passed, with 13 PostgreSQL-only tests
+explicitly skipped; 37 frontend tests passed, plus Ruff, ESLint and the frontend
+build. The backend checks include interrupted real HTTP fulfillment acceptance
+followed by reconciliation without another business write.
+
+Real Kafka verification passed in:
+https://github.com/Shivali32/BridgeOps/actions/runs/39796678008
+That run verified image startup, worker restart, broker outage, duplicate delivery,
+malformed-message quarantine, both repeatable retailer demos and all four browser
+journeys through Kafka. The frontend job also passed.
+
+The complete backend suite passed with 131 tests against PostgreSQL inside the
+actual API image, together with migration model-drift and Python checks. The CI
+pipeline runs that suite followed by the Kafka and browser scenarios. The frontend
+regression suite also verifies that refreshing Operations preserves approval notes
+and a queued approval result. Current branch verification:
+https://github.com/Shivali32/BridgeOps/actions?query=branch%3Awork%2Fbridgops-kafka
+
+The baseline and historical verification evidence below describe Stage 5.
 
 ## Verified milestones
 
@@ -77,7 +98,6 @@ migrations, Compose/host starts, React and tests. [demo.md](demo.md) covers the 
 retailers and failure recovery. [engineering-report.md](engineering-report.md) contains
 milestones, commit history, evidence, limits and setup links.
 
-Authentication/authorization, live source-provider accounts, stock release, fulfillment
-cancellation and durable background dispatch remain out of scope. Keep this version
-local. [stage6-handoff.md](stage6-handoff.md) describes future Kafka work without
-implementing it.
+Authentication/authorization, live source-provider accounts, stock release and fulfillment
+cancellation remain out of scope. Keep this version
+local. [stage6-handoff.md](stage6-handoff.md) preserves the original Kafka planning notes.

@@ -6,6 +6,8 @@ from sqlalchemy import create_engine, event, text
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
+os.environ.setdefault("WORKFLOW_MODE", "inline")
+
 os.environ.setdefault("POSTGRES_USER", "bridgops_test")
 os.environ.setdefault("POSTGRES_PASSWORD", "local_test_only")
 os.environ.setdefault("POSTGRES_DB", "bridgops_test")
@@ -64,11 +66,13 @@ def pg_engine():
         pytest.skip(
             "TEST_DATABASE_URL is required for real PostgreSQL concurrency tests"
         )
-    admin = create_engine(url)
+    admin = create_engine(url, connect_args={"connect_timeout": 5})
     schema = "test_" + uuid4().hex
     with admin.begin() as connection:
         connection.execute(text(f'CREATE SCHEMA "{schema}"'))
-    engine = create_engine(url, connect_args={"options": f"-csearch_path={schema}"})
+    engine = create_engine(
+        url, connect_args={"connect_timeout": 5, "options": f"-csearch_path={schema}"}
+    )
     try:
         Base.metadata.create_all(engine)
         yield engine

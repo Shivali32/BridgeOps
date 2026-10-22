@@ -1,4 +1,10 @@
-# Future Stage 6: Kafka handoff
+# Historical Stage 6 planning notes
+
+Kafka dispatch is now implemented on `work/bridgops-kafka`. See [kafka.md](kafka.md)
+for current behavior and setup, and [progress.md](progress.md) for verification.
+The text below records the original Stage 5 handoff.
+
+## Original plan
 
 Stages 1 to 5 deliver a synchronous local integration product. Kafka is not installed
 or implemented. First review the final engineering report and keep the verified

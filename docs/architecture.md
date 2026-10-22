@@ -1,4 +1,4 @@
-# BridgOps architecture through Stage 5
+# BridgOps architecture through Stage 6
 
 ## Components
 
@@ -15,8 +15,12 @@ This is an HTTP integration boundary, not independent database infrastructure.
 flowchart TD
     Browser["React operator workspace"] --> API["FastAPI platform"]
     API --> DB["PostgreSQL 17"]
-    API --> Inventory["Inventory REST simulator"]
-    API --> Fulfillment["Fulfillment REST simulator"]
+    DB --> Publisher["Outbox publisher"]
+    Publisher --> Kafka["Kafka command topic"]
+    Kafka --> Worker["Workflow worker"]
+    Worker --> DB
+    Worker --> Inventory["Inventory REST simulator"]
+    Worker --> Fulfillment["Fulfillment REST simulator"]
     Inventory --> DB
     Fulfillment --> DB
 ```
@@ -68,7 +72,7 @@ workflow version rows support inspection of prior configurations.
 
 ## Persistence and transaction boundaries
 
-There are 15 application/provider tables plus Alembic's version table. Business
+There are 18 application/provider tables plus Alembic's version table. Business
 relationships use tenant ownership and composite foreign keys where appropriate.
 Tenant filtering is data scoping, not authenticated user authorization.
 
@@ -78,6 +82,8 @@ Concurrency controls:
 |---|---|
 | Order creation | Tenant/external-ID uniqueness and specific conflict recovery |
 | Initial workflow claim | Order row lock and existing-execution check |
+| Kafka publication | Outbox row lock with skip-locked selection and broker confirmation |
+| Worker claim | Execution lock, ownership lease, current-event check and durable receipt |
 | Inventory reservation | Persistent tenant/key uniqueness; sorted stock row locks |
 | Fulfillment request | Persistent tenant/key uniqueness and payload comparison |
 | Approval decision | Execution row lock, valid state transitions and decision replay |
@@ -135,6 +141,14 @@ from the environment, not ordinary integration database fields. Management and
 provider demo controls are not safe to expose publicly.
 
 No live provider accounts, payment processing, stock release, fulfillment cancellation,
-background queue, Kafka, Kubernetes, Redis, Airflow or cloud deployment are included.
+Kubernetes, Redis, Airflow or cloud deployment are included.
 The provider failure simulators are single-worker process-local controls; actual stock,
 reservations and fulfillment state are persistent.
+
+## Kafka dispatch
+
+Process requests atomically save a pending execution and outbox command and return
+HTTP 202. Publisher confirmation, consumer receipts, queued approval/recovery
+commands and crash reconciliation are described in [kafka.md](kafka.md).
+The worker reuses the existing workflow runner and provider idempotency keys.
+The local Compose broker has one replica and does not provide high availability.

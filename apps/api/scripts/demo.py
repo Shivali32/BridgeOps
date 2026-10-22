@@ -2,6 +2,7 @@
 
 import json
 import os
+import time
 from pathlib import Path
 from urllib.error import HTTPError
 from urllib.request import ProxyHandler, Request, build_opener
@@ -183,6 +184,14 @@ for letter, connector_type in (
         execution = call(
             api, base + f"/orders/{record['order_id']}/process", method="POST"
         )
+        deadline = time.monotonic() + 90
+        while execution["status"] in ("pending", "running"):
+            if time.monotonic() > deadline:
+                raise RuntimeError(
+                    "Workflow did not finish. Check the Kafka publisher and worker."
+                )
+            time.sleep(0.25)
+            execution = call(api, base + f"/executions/{execution['id']}")
         statuses.append(execution["status"])
     if letter == "B":
         assert statuses[0] in ("needs_attention", "completed"), (

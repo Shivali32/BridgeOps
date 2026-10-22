@@ -307,3 +307,5 @@ textarea { width: 100%; resize: vertical; font-family: monospace; }
 .metrics-grid > div { display: grid; align-content: start; gap: 10px; border: 1px solid #dbe3ed; border-radius: 10px; padding: 20px; background: #f8fafc; }
 .metrics-grid strong { font-size: 26px; color: #1e40af; }
 .metrics-grid span { color: #475569; font-size: 13px; }
+
+.status-queued, .status-pending { background: #fff1cc; color: #715100; }

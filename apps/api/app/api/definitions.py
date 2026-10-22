@@ -1,10 +1,11 @@
 from typing import Annotated, Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, Response
 from sqlalchemy import select
 
-from app.api.workflows import DbSession, ProviderDependency
+from app.api.workflows import DbSession, ProviderDependency, execution_response
+from app.messaging.contracts import queued_mode
 from app.models.definition import Approval, WorkflowDefinition, WorkflowVersion
 from app.schemas.definition import (
     ApprovalDecision,
@@ -108,5 +109,9 @@ def decision(
     data: ApprovalDecision,
     db: DbSession,
     providers: ProviderDependency,
+    response: Response,
 ):
-    return decide_approval(db, tenant_id, approval_id, data, providers)
+    result = decide_approval(
+        db, tenant_id, approval_id, data, providers, queued=queued_mode()
+    )
+    return execution_response(response, tenant_id, result)

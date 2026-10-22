@@ -2,10 +2,12 @@ from datetime import datetime
 from typing import Annotated, Literal
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, Query
-from sqlalchemy import select
+from fastapi import APIRouter, HTTPException, Query, Response
+from sqlalchemy import func, select
 
-from app.api.workflows import DbSession, ProviderDependency
+from app.api.workflows import DbSession, ProviderDependency, execution_response
+from app.messaging.contracts import queued_mode
+from app.models.messaging import EventReceipt, OutboxEvent
 from app.models.operations import AuditEvent
 from app.schemas.execution import ExecutionResponse
 from app.schemas.operations import RecoveryAction
@@ -16,6 +18,44 @@ from app.services.workflow import get_execution
 router = APIRouter(
     prefix="/api/v1/tenants/{tenant_id}", tags=["Operations and recovery"]
 )
+
+
+@router.get("/queue")
+def queue_status(tenant_id: UUID, db: DbSession):
+    from app.services.order import require_tenant
+
+    require_tenant(db, tenant_id)
+
+    def count(*conditions):
+        return db.scalar(
+            select(func.count())
+            .select_from(OutboxEvent)
+            .where(OutboxEvent.tenant_id == tenant_id, *conditions)
+        )
+
+    return {
+        "pending_publication": count(OutboxEvent.published_at.is_(None)),
+        "awaiting_worker": count(
+            OutboxEvent.published_at.is_not(None),
+            ~OutboxEvent.id.in_(select(EventReceipt.event_id)),
+        ),
+        "processed": count(OutboxEvent.id.in_(select(EventReceipt.event_id))),
+        "recent_events": [
+            {
+                "id": e.id,
+                "execution_id": e.execution_id,
+                "published_at": e.published_at,
+                "attempts": e.attempts,
+                "last_error": e.last_error,
+            }
+            for e in db.scalars(
+                select(OutboxEvent)
+                .where(OutboxEvent.tenant_id == tenant_id)
+                .order_by(OutboxEvent.created_at.desc())
+                .limit(20)
+            )
+        ],
+    }
 
 
 @router.get("/operations")
@@ -69,8 +109,10 @@ def recovery(
     data: RecoveryAction,
     db: DbSession,
     providers: ProviderDependency,
+    response: Response,
 ):
-    return recover(db, tenant_id, execution_id, data, providers)
+    result = recover(db, tenant_id, execution_id, data, providers, queued=queued_mode())
+    return execution_response(response, tenant_id, result)
 
 
 @router.get("/executions/{execution_id}/audit")
