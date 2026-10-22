@@ -37,3 +37,7 @@ Thumbs.db
 .terraform/
 *.tfstate
 *.tfstate.*
+
+# Browser test artifacts
+playwright-report/
+test-results/

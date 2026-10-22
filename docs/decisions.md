@@ -144,3 +144,31 @@ Tradeoff:
 Initial operations will not benefit from asynchronous decoupling.
 
 Kafka will be introduced when event-driven workflow processing is implemented.
+
+## ADR-009: Roadmap through the local integration product
+
+Stages 2 to 5 now mean synchronous order processing, reusable connectors, configurable
+workflows and operations/recovery. Kafka is Stage 6 and remains deferred. The older
+roadmap in historical conversations is superseded by this implementation scope.
+
+## ADR-010: Controlled configuration with immutable snapshots
+
+Use a small explicit connector registry and validated workflow step/rule schemas.
+Mappings and workflows cannot execute arbitrary code. Imports snapshot mappings;
+executions snapshot definitions, versions, source context and order values. Configuration
+changes apply to new executions, not already paused/running work.
+
+## ADR-011: Persistent side effects and synchronous boundaries
+
+Keep the two provider simulators as independent HTTP processes with persistent
+provider tables in the same PostgreSQL instance. This keeps the demo lightweight.
+Commit step state before outbound calls and avoid holding transactions during HTTP.
+Stable idempotency keys and provider lookups govern retries and uncertain outcomes.
+
+## ADR-012: Recover with claims, fencing and audit
+
+Use execution row locks, persistent recovery request keys and ownership tokens.
+Preserve successful steps and append attempts. A stale runner cannot overwrite a
+new recovery. Require provider reconciliation or reference verification for uncertain
+writes. Investigation notes cannot freely change completion state. Operator identities
+are explicitly self-reported development labels until authentication is added.

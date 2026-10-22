@@ -3,6 +3,8 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 
 from sqlalchemy import (
+    JSON,
+    Boolean,
     CheckConstraint,
     DateTime,
     ForeignKey,
@@ -11,6 +13,8 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    UniqueConstraint,
+    func,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.types import Uuid
@@ -25,6 +29,7 @@ class WorkflowExecution(Base):
     __tablename__ = "workflow_executions"
 
     __table_args__ = (
+        UniqueConstraint("id", "tenant_id", name="uq_execution_id_tenant"),
         ForeignKeyConstraint(
             ["order_id", "tenant_id"],
             ["orders.id", "orders.tenant_id"],
@@ -80,6 +85,15 @@ class WorkflowExecution(Base):
         nullable=True,
     )
 
+    run_token: Mapped[uuid.UUID | None] = mapped_column(Uuid)
+    heartbeat_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    definition_snapshot: Mapped[dict] = mapped_column(
+        JSON, nullable=False, default=dict, server_default="{}"
+    )
+    error_category: Mapped[str | None] = mapped_column(String(50))
+
     order: Mapped["Order"] = relationship(
         back_populates="executions",
         foreign_keys=[order_id, tenant_id],
@@ -95,6 +109,9 @@ class StepExecution(Base):
     __tablename__ = "step_executions"
 
     __table_args__ = (
+        UniqueConstraint(
+            "execution_id", "step_name", "attempt_number", name="uq_step_attempt"
+        ),
         CheckConstraint(
             "attempt_number > 0",
             name="ck_step_executions_attempt",
@@ -155,6 +172,19 @@ class StepExecution(Base):
     error_message: Mapped[str | None] = mapped_column(
         Text,
         nullable=True,
+    )
+
+    input_summary: Mapped[dict] = mapped_column(
+        JSON, nullable=False, default=dict, server_default="{}"
+    )
+    output_summary: Mapped[dict] = mapped_column(
+        JSON, nullable=False, default=dict, server_default="{}"
+    )
+    idempotency_key: Mapped[str | None] = mapped_column(String(150))
+    external_reference: Mapped[str | None] = mapped_column(String(150))
+    error_category: Mapped[str | None] = mapped_column(String(50))
+    retryable: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
     )
 
     execution: Mapped["WorkflowExecution"] = relationship(

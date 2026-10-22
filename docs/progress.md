@@ -1,140 +1,83 @@
+# BridgOps development progress
 
-# BridgOps Development Progress
+Updated: 21 October 2026.
 
-Last updated: 2026-10-21
+Stages 1 to 5 are implemented. Kafka and Stage 6 are not implemented.
+Work is on `work/bridgops-stage2-to-stage5`; main remains unchanged.
+Draft review: https://github.com/Shivali32/BridgeOps/pull/1
 
-## Current Stage
+## Verified milestones
 
-Stage 1: Application Foundation
+| Stage | Delivered | Verification |
+|---|---|---|
+| 1 | Existing tenant application and development foundation preserved | Original baseline: 24 backend and 7 frontend tests passed |
+| 2 | Order APIs, inventory/fulfillment REST services, synchronous workflow and React orders | Service/API, PostgreSQL concurrency, real HTTP and browser checks passed |
+| 3 | Three connectors, canonical mappings, tenant configurations, audited imports and integration UI | Transformation/CSV/scoping/UI tests, three-retailer HTTP and browser CSV checks passed |
+| 4 | Versioned workflows, typed rules, branches, approvals, assignment and configuration UI | Rule/version/decision tests, PostgreSQL approval race and browser approval passed |
+| 5 | Operations, summaries, recovery, reconciliation, fencing, audit and central approval management | PostgreSQL retry races, real HTTP recovery, browser recovery, Compose images and repeatable demo passed |
 
-Current task:
-Step 7 - Documentation and setup verification
+Latest fully verified implementation checkpoint: `5a699bb`.
+All three CI jobs passed in:
+https://github.com/Shivali32/BridgeOps/actions/runs/39665127385
 
-## Completed
+The final report/diagnostic checkpoint follows it and runs the same required pipeline.
+Latest branch CI: https://github.com/Shivali32/BridgeOps/actions?query=branch%3Awork%2Fbridgops-stage2-to-stage5
 
-### Repository and Environment
-- Initialized Git repository
-- Renamed project to BridgOps
-- Configured Python development environment
-- Configured Node.js environment
-- Verified Docker Desktop and WSL 2
-- Created GitHub repository and pushed code
+## Actual checks
 
-### Backend
-- Created FastAPI application
-- Implemented health endpoints
-- Configured PostgreSQL with Docker Compose
-- Configured SQLAlchemy database connection
-- Configured Alembic migrations
-- Created Tenant model
-- Implemented tenant CRUD API
-- Added Pydantic validation
-- Added database error handling
+| Check | Result |
+|---|---|
+| Local backend | 101 passed, 10 PostgreSQL tests explicitly skipped |
+| PostgreSQL CI backend | 111 passed, 0 skipped |
+| Frontend | 35 passed across 7 files |
+| Playwright | Four browser journeys passed against PostgreSQL and real services |
+| Ruff, ESLint, TypeScript/Vite | Passed |
+| Alembic | Upgrade to 7af6_operations and model-drift check passed |
+| Compose | Configuration, actual image build/start and HTTP workflow passed |
+| Seeded product demo | A completed, B pending approval, C valid orders plus invalid row; repeated twice successfully |
 
-### Frontend
-- Initialized React with TypeScript and Vite
-- Configured local API proxy
-- Created Tenant API client
-- Implemented tenant listing
-- Implemented tenant creation
-- Implemented tenant editing
-- Implemented tenant deactivation
-- Added loading and error states
+PostgreSQL races use separate sessions and isolated random schemas. Coverage includes
+order duplicates/conflicts, stock reservations, fulfillment duplicates/conflicts,
+workflow claims, conflicting approval decisions and same/different-key recoveries.
 
-### Testing and CI
-- 11 backend tests passed
-- 7 frontend tests passed
-- Frontend build and lint passed
-- GitHub Actions backend job passed
-- GitHub Actions frontend job passed
+HTTP tests start actual servers and cover all source formats, standard processing,
+approval pause/resume, fulfillment failure/retry, lost responses, by-key reconciliation
+and supplied-reference verification. Frontend/browser checks cover forms, source imports,
+workflow configuration, approval decisions, inspection and failure recovery.
 
-## In Progress
+Docker and browser execution were unavailable inside Work itself. Those checks ran
+on isolated GitHub runners. The user's Windows repository/database was not accessed.
+The Windows runbook has not been executed on the user's computer.
 
-- README improvements
-- Architecture documentation
-- Developer setup instructions
-- Stage 1 final verification
+## Important corrections found during verification
 
-## Upcoming
+- The handoff described order API routes that were absent; implemented and tested them.
+- Fixed inactive-tenant writes, missing-tenant reads and atomic rollback handling.
+- Fixed provider model import cycles using fresh-process startup checks.
+- Fixed environment discovery for the shallower container filesystem layout.
+- Added provider/API health checks and bounded startup handling for transient resets.
+- Stabilized the intentionally induced timeout scenario before independent reconciliation.
+- Failed imports retain safe source identifiers as well as row numbers and diagnostics.
 
-### Stage 1 Completion
-- Verify documentation links
-- Verify a clean project setup
-- Add basic Python linting
-- Confirm GitHub repository is up to date
+## Persistent behavior
 
-### Stage 2
-- Define Order and OrderItem models
-- Implement order submission API
-- Create simulated inventory integration
-- Create simulated fulfillment integration
-- Implement first synchronous order workflow
-- Store workflow execution status
-- Display orders in React
-- Add integration tests
+Orders retain their external-ID/tenant uniqueness and immutable contents. Integrations
+and workflows use versions; imports and executions preserve snapshots. Step records
+persist before HTTP calls, without holding database transactions across those calls.
+Provider references and stable keys support reconciliation and deliberate manual retry.
 
-## Known Limitations
+Approvals pause before stock reservation. Recovery preserves completed steps and
+appends attempts. Ownership fencing protects stale-run recovery. Investigation notes
+cannot freely mark an order completed. A completed workflow means fulfillment accepted.
 
-- No authentication or authorization
-- Tenant management is development-only
-- Tenant data isolation is not yet enforced for business operations
-- No order processing yet
-- No workflow engine yet
-- No Kafka consumers or producers
-- No external retail integrations
-- No production deployment
-- Frontend tests use mocked API responses
-- Backend tenant API tests use SQLite
+## Local demonstration and handoff
 
-## Deferred Features
+See [development.md](development.md) for safe PowerShell branch updates, .env preservation,
+migrations, Compose/host starts, React and tests. [demo.md](demo.md) covers the three
+retailers and failure recovery. [engineering-report.md](engineering-report.md) contains
+milestones, commit history, evidence, limits and setup links.
 
-- Kafka
-- Transactional outbox
-- Configurable workflows
-- Approval workflows
-- Multi-store permissions
-- Prometheus and Grafana
-- Airflow
-- Kubernetes
-- Terraform
-- GCP
-
-## Important Decisions
-
-See decisions.md.
-
-## Local Development
-
-Database:
-
-    docker compose up -d postgres
-
-Backend:
-
-    cd apps/api
-    python -m uvicorn app.main:app --reload
-
-Frontend:
-
-    cd apps/web
-    npm run dev
-
-Detailed instructions:
-
-See development.md.
-
-## Stage 1 Exit Criteria
-
-- [x] Git repository created
-- [x] FastAPI backend working
-- [x] PostgreSQL connection working
-- [x] Alembic migrations configured
-- [x] Tenant CRUD API implemented
-- [x] React TypeScript frontend working
-- [x] Frontend communicates with backend
-- [x] Backend automated tests pass
-- [x] Frontend automated tests pass
-- [x] GitHub Actions CI passes
-- [ ] Documentation committed and verified
-- [ ] Fresh-clone setup verified
-- [ ] Final Stage 1 review completed
+Authentication/authorization, live source-provider accounts, stock release, fulfillment
+cancellation and durable background dispatch remain out of scope. Keep this version
+local. [stage6-handoff.md](stage6-handoff.md) describes future Kafka work without
+implementing it.

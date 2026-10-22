@@ -21,12 +21,26 @@ class OrderConflictError(Exception):
     pass
 
 
+class InactiveTenantError(Exception):
+    pass
+
+
+def require_tenant(db: Session, tenant_id: UUID, *, active: bool = False) -> Tenant:
+    tenant = db.get(Tenant, tenant_id)
+    if tenant is None:
+        raise TenantNotFoundError("Tenant not found.")
+    if active and not tenant.is_active:
+        raise InactiveTenantError("Tenant is inactive.")
+    return tenant
+
+
 def get_order(
     db: Session,
     tenant_id: UUID,
     order_id: UUID,
 ) -> Order:
     """Get an order belonging to the specified tenant."""
+    require_tenant(db, tenant_id)
     stmt = (
         select(Order)
         .options(selectinload(Order.items))
@@ -74,11 +88,13 @@ def list_orders(
     if offset < 0:
         raise ValueError("Offset cannot be negative.")
 
+    require_tenant(db, tenant_id)
+
     stmt = (
         select(Order)
         .options(selectinload(Order.items))
         .where(Order.tenant_id == tenant_id)
-        .order_by(Order.id)
+        .order_by(Order.created_at.desc(), Order.id)
         .limit(limit)
         .offset(offset)
     )
@@ -122,10 +138,7 @@ def create_order(
 ) -> tuple[Order, bool]:
     """Create an order or return an existing identical order."""
 
-    tenant = db.get(Tenant, tenant_id)
-
-    if tenant is None:
-        raise TenantNotFoundError("Tenant not found.")
+    require_tenant(db, tenant_id, active=True)
 
     # Return an identical order if it already exists.
     existing = _resolve_duplicate(db, tenant_id, data)
@@ -147,17 +160,19 @@ def create_order(
     )
 
     try:
-        # The savepoint allows recovery from concurrent
-        # duplicate submissions.
-        with db.begin_nested():
-            db.add(order)
-            db.flush()
+        # This service owns the transaction. Roll back before resolving a race.
+        db.add(order)
+        db.flush()
+
+        db.commit()
 
     except IntegrityError as exc:
+        db.rollback()
         code = getattr(exc.orig, "sqlstate", None) or getattr(exc.orig, "pgcode", None)
+        constraint = getattr(getattr(exc.orig, "diag", None), "constraint_name", None)
 
         # PostgreSQL unique constraint violation.
-        if code != "23505":
+        if code != "23505" or constraint != "uq_orders_tenant_external_id":
             raise
 
         existing = _resolve_duplicate(db, tenant_id, data)
@@ -167,6 +182,8 @@ def create_order(
 
         return existing, False
 
-    db.commit()
+    except Exception:
+        db.rollback()
+        raise
 
     return get_order(db, tenant_id, order.id), True

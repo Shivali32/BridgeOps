@@ -7,9 +7,18 @@ from sqlalchemy import create_engine
 from sqlalchemy.engine import URL
 from sqlalchemy.orm import Session, sessionmaker
 
-# Find .env in the repository root
-BASE_DIR = Path(__file__).resolve().parents[3]
-load_dotenv(BASE_DIR / ".env")
+# Find the repository marker without assuming a minimum directory depth.
+# Container images receive credentials through the environment instead.
+PROJECT_ROOT = next(
+    (
+        parent
+        for parent in Path(__file__).resolve().parents
+        if (parent / ".env.example").is_file()
+    ),
+    None,
+)
+if PROJECT_ROOT is not None:
+    load_dotenv(PROJECT_ROOT / ".env")
 
 # Read database credentials
 DB_USER = os.environ["POSTGRES_USER"]
@@ -21,8 +30,8 @@ DATABASE_URL = URL.create(
     drivername="postgresql+psycopg",
     username=DB_USER,
     password=DB_PASSWORD,
-    host="localhost",
-    port=5433,
+    host=os.getenv("POSTGRES_HOST", "localhost"),
+    port=int(os.getenv("POSTGRES_PORT", "5433")),
     database=DB_NAME,
 )
 

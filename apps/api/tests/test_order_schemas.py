@@ -78,3 +78,9 @@ def test_negative_price():
                 }
             ],
         )
+
+
+@pytest.mark.parametrize("quantity", [True, 1_000_001])
+def test_quantity_rejects_booleans_and_database_overflow(quantity):
+    with pytest.raises(ValidationError):
+        OrderCreate(external_order_id="Q", items=[{"sku": "A", "quantity": quantity}])

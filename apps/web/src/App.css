@@ -276,3 +276,34 @@
     padding: 16px;
   }
 }
+
+fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
+select, textarea, .item-row input { padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; font: inherit; max-width: 100%; }
+.item-row { display: grid; grid-template-columns: 2fr 1fr 1fr auto; gap: 12px; margin: 16px 0; align-items: end; }
+.item-row label { display: grid; gap: 6px; min-width: 0; }
+.item-row input { width: 100%; }
+button { cursor: pointer; padding: 9px 12px; border: 1px solid #cbd5e1; border-radius: 6px; background: #fff; color: #334155; }
+button:disabled { opacity: .5; cursor: not-allowed; }
+button:focus-visible, select:focus-visible, summary:focus-visible { outline: 2px solid #2563eb; outline-offset: 3px; }
+.status-badge { display: inline-block; padding: 4px 9px; border-radius: 6px; background: #e2e8f0; font-size: 13px; }
+.status-completed { background: #dcfce7; color: #166534; }
+.status-failed { background: #fee2e2; color: #991b1b; }
+.status-needs_attention, .status-unknown { background: #fef3c7; color: #92400e; }
+.status-running, .status-processing { background: #dbeafe; color: #1e40af; }
+.pagination { display: flex; align-items: center; gap: 12px; margin: 20px 0; flex-wrap: wrap; }
+.execution-card { padding: 20px; border: 1px solid #cbd5e1; border-radius: 10px; margin-top: 20px; }
+.execution-card code { overflow-wrap: anywhere; font-size: 12px; }
+.step-list { padding-left: 24px; }
+.step-list li { padding: 14px 0; border-bottom: 1px solid #e2e8f0; }
+.step-list li > span { margin-left: 12px; }
+pre { overflow: auto; max-height: 300px; padding: 14px; background: #f1f5f9; font-size: 12px; }
+.local-notice { color: #92400e; font-size: 13px; }
+@media (max-width: 700px) { .item-row { grid-template-columns: 1fr 1fr; } .execution-card { padding: 12px; } }
+.mapping-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(160px,1fr)); gap: 16px; margin-top: 16px; }
+.workspace-nav { display: flex; gap: 10px; margin: 24px 0; flex-wrap: wrap; }
+.workspace-nav button[aria-pressed="true"] { color: #fff; background: #2563eb; border-color: #2563eb; }
+textarea { width: 100%; resize: vertical; font-family: monospace; }
+.metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin: 24px 0; }
+.metrics-grid > div { display: grid; align-content: start; gap: 10px; border: 1px solid #dbe3ed; border-radius: 10px; padding: 20px; background: #f8fafc; }
+.metrics-grid strong { font-size: 26px; color: #1e40af; }
+.metrics-grid span { color: #475569; font-size: 13px; }

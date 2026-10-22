@@ -1,151 +1,104 @@
-
 # BridgOps
 
-### Multi-Tenant Retail Integration & Workflow Platform
+A multi-tenant retail integration and workflow platform for local development.
+Connect different order formats, apply retailer-specific workflows, pause for approval,
+and recover failures without repeating successful business operations.
 
-BridgOps is a software platform designed to help retail businesses connect independent applications, automate operational workflows, and monitor business processes from a centralized dashboard.
+**Local demo only. Authentication and tenant authorization are not implemented.**
+All Compose ports bind to loopback. A tenant selector is not an access-control system.
 
-The platform is being developed as a production-style full-stack engineering project focused on backend systems, enterprise integrations, multi-tenancy, reliability, and distributed architecture.
+## What works
 
-## The Problem
+- Tenant management and tenant-scoped orders with normalized duplicate handling.
+- Simulated Shopify-style JSON, custom REST JSON and grouped CSV imports.
+- Versioned integration mappings with validation and persistent import results.
+- Configurable, versioned workflows with typed rules and conditional approvals.
+- Separate inventory and fulfillment REST services with persistent idempotency.
+- Stock reservations protected against concurrent overselling.
+- Execution steps, provider references, failure categories and approval history.
+- Operations filters, database summaries, safe retries, reconciliation and audit notes.
+- A React workspace for orders, integrations, workflows, approvals and operations.
 
-Retail businesses often use separate systems for order management, inventory, fulfillment, delivery, and customer communication.
+Completed workflow means **fulfillment request accepted**, not delivered.
+Saving/importing an order does not start processing automatically. Process is an
+explicit synchronous action. No Kafka or background messaging has been added.
 
-These applications may expose different APIs, use different data formats, and require manual coordination.
+## Run locally on Windows
 
-BridgOps aims to provide a common integration and workflow layer between these systems.
+Requirements: Python 3.12, Node.js 22, Git and Docker Desktop with WSL 2.
 
-For example:
+```powershell
+Copy-Item .env.example .env
+notepad .env
+```
 
-Order Received → Inventory Check → Stock Reservation → Fulfillment → Notification
+Set a local PostgreSQL password and `INGEST_TOKEN`. When reusing an existing database,
+keep its existing credentials. Changing `.env` does not change an initialized database password.
 
-The platform will also handle failures, retries, workflow tracking, and customer-specific configurations.
+```powershell
+docker compose --profile app up -d --build
+cd apps\web
+npm.cmd ci
+npm.cmd run dev
+```
 
-## Current Implementation
+Open http://localhost:5173. The app profile starts PostgreSQL, migrations, the API,
+inventory and fulfillment. PostgreSQL alone remains `docker compose up -d postgres`.
 
-Stage 1: Application Foundation
+Seed three example retailers, including a pending approval and a CSV validation failure:
 
-Implemented:
-- FastAPI REST backend
-- PostgreSQL database using Docker Compose
-- SQLAlchemy ORM and Alembic migrations
-- Tenant creation, retrieval, updates, and deactivation
-- Pydantic request and response validation
-- React and TypeScript frontend
-- Interactive tenant management dashboard
-- API error handling and loading states
-- Backend tests with pytest
-- Frontend tests with Vitest and React Testing Library
-- GitHub Actions continuous integration
+```powershell
+# From the repository root, in another terminal:
+docker compose --profile app exec -T api python scripts/demo.py
+```
 
-The current implementation focuses on tenant administration and basic full-stack infrastructure.
+The demo can be repeated. It reuses orders/configurations and only initializes missing
+stock. It does not reset your database. Refresh retailer choices in React afterward.
 
-Authentication, tenant-level authorization, order processing, and workflow execution are not implemented yet.
+See [Windows setup and safe branch update](docs/development.md),
+[demonstration guide](docs/demo.md), [architecture](docs/architecture.md),
+[progress](docs/progress.md), and [engineering report](docs/engineering-report.md).
 
-## Technology Stack
+## Local services
 
-| Layer | Technology |
+| Service | Address |
 |---|---|
-| Backend | Python, FastAPI |
-| Frontend | React, TypeScript, Vite |
-| Database | PostgreSQL |
-| ORM | SQLAlchemy |
-| Migrations | Alembic |
-| Local Infrastructure | Docker Compose |
-| Backend Testing | pytest |
-| Frontend Testing | Vitest, React Testing Library |
-| CI | GitHub Actions |
+| React | http://localhost:5173 |
+| API and Swagger | http://127.0.0.1:8000/docs |
+| Inventory and Swagger | http://127.0.0.1:8001/docs |
+| Fulfillment and Swagger | http://127.0.0.1:8002/docs |
+| PostgreSQL host port | localhost:5433 |
 
-## Architecture
+## Checks
 
-React Dashboard
-    |
-    v
-Vite Development Proxy
-    |
-    v
-FastAPI REST API
-    |
-    v
-SQLAlchemy
-    |
-    v
-PostgreSQL
+From `apps/api` in a virtual environment with requirements installed:
 
-The initial architecture uses a modular FastAPI backend with a separate React frontend.
+```powershell
+python -m pytest -v
+python -m ruff check app tests scripts
+python -m ruff format --check app tests scripts
+```
 
-The database uses a shared-database tenancy model. Each tenant represents a business account.
+From `apps/web`:
 
-Tenant authentication and isolation will be enforced before exposing the platform publicly.
+```powershell
+npm.cmd run test
+npm.cmd run lint
+npm.cmd run build
+```
 
-See [Architecture Documentation](docs/architecture.md).
+PostgreSQL concurrency tests use `TEST_DATABASE_URL` and isolated random schemas.
+Without it, those tests are explicitly skipped. CI supplies PostgreSQL 17, verifies
+migrations, runs real HTTP and browser scenarios, and checks the actual Compose images.
 
-## Getting Started
+## Stack and scope
 
-### Requirements
+Python, FastAPI, Pydantic, SQLAlchemy, PostgreSQL 17, Alembic, React, TypeScript,
+Vite, pytest, Ruff, Vitest, Testing Library, Playwright, Docker Compose and GitHub Actions.
 
-- Python 3.12
-- Node.js 22
-- Docker Desktop with Docker Compose
-- Git
+Stages 1 to 5 cover the local integration product. Stage 6, Kafka, is deferred.
+Future infrastructure is not required for this version. See [Stage 6 handoff](docs/stage6-handoff.md).
 
-### Quick Start
-
-1. Clone the repository.
-2. Copy `.env.example` to `.env` and configure a local database password.
-3. Start PostgreSQL using Docker Compose.
-4. Install backend dependencies and run Alembic migrations.
-5. Start the FastAPI server.
-6. Install frontend dependencies and start Vite.
-
-Detailed instructions:
-
-[Development Setup](docs/development.md)
-
-### Local URLs
-
-| Service | URL |
-|---|---|
-| Frontend | http://localhost:5173 |
-| API | http://127.0.0.1:8000 |
-| Swagger Documentation | http://127.0.0.1:8000/docs |
-| API Health | http://127.0.0.1:8000/health |
-| Database Health | http://127.0.0.1:8000/health/db |
-
-## Testing
-
-Backend:
-
-    cd apps/api
-    python -m pytest -v
-
-Frontend:
-
-    cd apps/web
-    npm run test
-    npm run lint
-    npm run build
-
-GitHub Actions automatically runs backend and frontend checks on pushes to main and pull requests targeting main.
-
-## Development Roadmap
-
-- Stage 1: Application foundation and tenant management
-- Stage 2: Orders and simulated external integrations
-- Stage 3: Kafka and asynchronous workflow processing
-- Stage 4: Multi-tenancy, authorization, and configurable workflows
-- Stage 5: Monitoring and reliability
-- Stage 6: Airflow and data reconciliation
-- Stage 7: Kubernetes and infrastructure automation
-- Stage 8: CI/CD and automated quality improvements
-- Stage 9: Final validation and portfolio preparation
-
-Basic CI was introduced early in Stage 1.
-
-See [Development Progress](docs/progress.md).
-
-## Project Status
-
-Active development.
-
-The project is currently intended for local development and demonstration. It is not production-ready or safe for public deployment without authentication, authorization, and further security testing.
+Limitations: no authentication/authorization, no live Shopify account integration,
+no payment/delivery processing, no stock release or fulfillment cancellation, and
+no production deployment. Demo failure controls require trusted local development.
