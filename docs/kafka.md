@@ -21,7 +21,9 @@ Invoke-RestMethod http://127.0.0.1:8000/health/db
 
 Git creates a local tracking branch automatically when only the matching remote
 branch exists. Compose applies the new migration before the application starts.
-The migration and kafka-init containers should exit successfully; they are jobs.
+The migration, kafka-volume-init and kafka-init containers should exit successfully;
+they are jobs. The volume setup job gives Kafka's non-root user ownership of its
+data directory before the broker starts.
 Kafka, publisher and worker should stay running alongside the existing services.
 
 In another terminal:

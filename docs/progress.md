@@ -1,10 +1,20 @@
 # BridgOps development progress
 
-Updated: 21 October 2026.
+Updated: 22 October 2026.
 
-Stages 1 to 5 are implemented. Kafka and Stage 6 are not implemented.
-Work is on `work/bridgops-stage2-to-stage5`; main remains unchanged.
-Draft review: https://github.com/Shivali32/BridgeOps/pull/1
+Stages 1 to 5 remain implemented. Stage 6 Kafka dispatch is implemented on
+`work/bridgops-kafka`. Main and the Stage 5 branch are unchanged.
+Draft Kafka review: https://github.com/Shivali32/BridgeOps/pull/2
+Setup and demonstration: [kafka.md](kafka.md).
+
+Stage 6 local checks pass for queued processing, duplicates, approvals, recovery,
+malformed events and interrupted real HTTP fulfillment followed by reconciliation.
+The first CI run passed PostgreSQL migration/concurrency checks and existing browser
+journeys. Its Docker check found a Kafka volume ownership issue; a setup job now
+initializes permissions for the non-root broker. Full Kafka/Compose verification
+is pending the follow-up CI run.
+
+The baseline and historical verification evidence below describe Stage 5.
 
 ## Verified milestones
 
@@ -77,7 +87,6 @@ migrations, Compose/host starts, React and tests. [demo.md](demo.md) covers the 
 retailers and failure recovery. [engineering-report.md](engineering-report.md) contains
 milestones, commit history, evidence, limits and setup links.
 
-Authentication/authorization, live source-provider accounts, stock release, fulfillment
-cancellation and durable background dispatch remain out of scope. Keep this version
-local. [stage6-handoff.md](stage6-handoff.md) describes future Kafka work without
-implementing it.
+Authentication/authorization, live source-provider accounts, stock release and fulfillment
+cancellation remain out of scope. Keep this version
+local. [stage6-handoff.md](stage6-handoff.md) preserves the original Kafka planning notes.

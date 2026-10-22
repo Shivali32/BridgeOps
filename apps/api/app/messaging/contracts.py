@@ -1,23 +1,37 @@
 import os
-from datetime import datetime
 from typing import Literal
 from uuid import UUID, uuid4
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import AwareDatetime, BaseModel, ConfigDict, model_validator
 
 
 class WorkEvent(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    schema_version: Literal[1] = 1
+    schema_version: Literal[1]
     event_id: UUID
     tenant_id: UUID
     order_id: UUID
     execution_id: UUID
-    created_at: datetime
+    created_at: AwareDatetime
     kind: Literal["run", "recover"]
     recovery_request_id: UUID | None = None
     step_id: UUID | None = None
     step_kind: str | None = None
+
+    @model_validator(mode="after")
+    def command_fields(self):
+        fields = (self.recovery_request_id, self.step_id, self.step_kind)
+        if self.kind == "recover" and (
+            not all(fields)
+            or self.step_kind
+            not in ("inventory_check", "inventory_reservation", "fulfillment_request")
+        ):
+            raise ValueError(
+                "Recovery commands require a recovery request and provider step"
+            )
+        if self.kind == "run" and any(fields):
+            raise ValueError("Run commands cannot include recovery fields")
+        return self
 
 
 def queued_mode():
@@ -38,6 +52,7 @@ def enqueue(
     from app.services.workflow import now
 
     event = WorkEvent(
+        schema_version=1,
         event_id=uuid4(),
         tenant_id=execution.tenant_id,
         order_id=execution.order_id,

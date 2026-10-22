@@ -58,8 +58,22 @@ def receipt(db, event):
 
 def reconcile_interrupted(db, execution, providers, claim_token):
     """Only read a provider after a crash; an uncertain write needs operator recovery."""
-    for step in list(execution.steps):
-        if step.status != "running" or not step.idempotency_key:
+    latest = {
+        s.step_name: s for s in sorted(execution.steps, key=lambda s: s.attempt_number)
+    }
+    for step in latest.values():
+        if step.status != "running":
+            continue
+        if not step.idempotency_key:
+            if not owns_execution(db, execution.tenant_id, execution.id, claim_token):
+                return False
+            step.status, step.completed_at = "failed", now()
+            step.error_category, step.error_message = (
+                "worker_interrupted",
+                "Read-only step interrupted; safe to repeat.",
+            )
+            step.retryable = True
+            db.commit()
             continue
         specs = execution.definition_snapshot["steps"]
         kind = next(

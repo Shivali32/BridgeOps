@@ -158,14 +158,6 @@ def recover(db, tenant_id, execution_id, data, providers, *, queued=False):
     claim_token = execution.run_token
     order = db.get(Order, execution.order_id)
     order.status = "processing"
-    audit(
-        db,
-        execution,
-        "retry_requested" if data.action == "retry" else "reconciliation_requested",
-        previous_state,
-        data.note,
-        data.development_operator,
-    )
     if queued:
         from app.messaging.contracts import enqueue
 
@@ -177,6 +169,14 @@ def recover(db, tenant_id, execution_id, data, providers, *, queued=False):
             step_id=step.id,
             step_kind=kind,
         )
+    audit(
+        db,
+        execution,
+        "retry_requested" if data.action == "retry" else "reconciliation_requested",
+        previous_state,
+        data.note,
+        data.development_operator,
+    )
     db.commit()
     if queued:
         return get_execution(db, tenant_id, execution_id)

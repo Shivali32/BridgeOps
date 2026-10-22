@@ -381,6 +381,10 @@ def decide_approval(db, tenant_id, approval_id, data, providers, *, queued=False
         execution.error_message = step.error_message = "Operator rejected the order."
     else:
         execution.status, order.status = "running", "processing"
+    if queued and decision == "approved":
+        from app.messaging.contracts import enqueue
+
+        enqueue(db, execution)
     from app.models.operations import AuditEvent
 
     db.add(
@@ -394,10 +398,6 @@ def decide_approval(db, tenant_id, approval_id, data, providers, *, queued=False
             development_operator=data.development_operator,
         )
     )
-    if queued and decision == "approved":
-        from app.messaging.contracts import enqueue
-
-        enqueue(db, execution)
     db.commit()
     if queued:
         return get_execution(db, tenant_id, execution_id)
